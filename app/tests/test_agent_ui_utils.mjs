@@ -1,0 +1,16 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {nextMentionIndex, SSEFrames, traceOverview} from '../web/agent-ui-utils.mjs';
+const doc = usable => ({type:'document', usable});
+test('empty mention list has no active option',()=>assert.equal(nextMentionIndex([],0),-1));
+test('keyboard skips unparsed documents',()=>assert.equal(nextMentionIndex([doc(false),doc(true)],-1),1));
+test('all disabled options cannot be selected',()=>assert.equal(nextMentionIndex([doc(false)],0),-1));
+test('keyboard reaches results beyond old 45-item display',()=>assert.equal(nextMentionIndex(Array.from({length:60},()=>doc(true)),44),45));
+test('keyboard wraps both ways without selecting disabled rows',()=>{const rows=[doc(true),doc(false),{type:'agent'}];assert.equal(nextMentionIndex(rows,2,1),0);assert.equal(nextMentionIndex(rows,0,-1),2);});
+test('SSE fragmented LF frames preserve contents',()=>{const s=new SSEFrames();assert.deepEqual(s.push('event: trace\ndata: {"text":"中'),[]);assert.deepEqual(s.push('文"}\n\n'),[{event:'trace',id:null,data:'{"text":"中文"}'}]);});
+test('SSE handles CRLF split at network boundary',()=>{const s=new SSEFrames();assert.deepEqual(s.push('id: 4\r\nevent: trace\r\ndata: {}\r'),[]);assert.deepEqual(s.push('\n\r\n'),[{event:'trace',id:'4',data:'{}'}]);});
+test('SSE multiline data joins with newline',()=>{const s=new SSEFrames();assert.equal(s.push('data: {\ndata: "ok":true\ndata: }\n\n')[0].data,'{\n"ok":true\n}');});
+test('SSE comments and unknown fields are not events',()=>assert.deepEqual(new SSEFrames().push(': heartbeat\nretry: 100\n\n'),[]));
+test('SSE drains once without duplicate replay',()=>{const s=new SSEFrames();assert.equal(s.push('data: 1\n\ndata: 2\n\n').length,2);assert.deepEqual(s.push(''),[]);});
+test('trace summary reports steps and known tokens without recounting subsets',()=>{const result=traceOverview([{event:'run.start',payload:{agent_name:'核查员',agent_revision:2}},{event:'human.message'},{event:'model.start'},{event:'model.request',payload:{model:'fixture'}},{event:'tool.result'},{event:'run.end',payload:{status:'completed',usage:{total_tokens:30,output_token_details:{reasoning:10}}}}]);assert.equal(result.agent,'核查员');assert.equal(result.modelSteps,1);assert.equal(result.toolResults,1);assert.equal(result.usage.total_tokens,30);});
+test('missing usage remains unknown',()=>assert.equal(traceOverview([]).usage,null));

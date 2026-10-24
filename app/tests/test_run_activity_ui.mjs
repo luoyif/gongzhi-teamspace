@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {terminalRun,toolLabel,summarizeActivity,mergeActivity,compactToolDetail} from '../web/run-activity-ui.mjs';
+const ev=(seq,event,payload={},span_id='c',parent_span='r')=>({seq,event,payload,span_id,parent_span});
+test('terminal states include paused but not running',()=>{assert.equal(terminalRun('paused'),true);assert.equal(terminalRun('running'),false);assert.equal(terminalRun('failed'),true);});
+test('same-name parallel calls do not overwrite each other',()=>{const x=summarizeActivity([ev(1,'tool.request',{name:'project_file_read',arguments:{path:'a'}},'a'),ev(2,'tool.request',{name:'project_file_read',arguments:{path:'b'}},'b'),ev(3,'tool.result',{name:'project_file_read',status:'success'},'a')]);assert.equal(x.tools.length,2);assert.equal(x.completed,1);assert.equal(x.tools[1].status,'running');});
+test('per-call approval and pregrant display',()=>{const x=summarizeActivity([ev(1,'tool.request',{name:'artifact_save'}),ev(2,'approval.required',{id:'a'},'approval','c'),ev(3,'approval.auto',{name:'artifact_save'},'auto','c')]);assert.equal(x.tools[0].status,'waiting');assert.equal(x.tools[0].automatic,true);});
+test('tool error remains error not success',()=>{const x=summarizeActivity([ev(1,'tool.request',{name:'read_file'}),ev(2,'tool.result',{name:'read_file',status:'error'})]);assert.equal(x.completed,0);assert.equal(x.tools[0].status,'error');});
+test('cursor replay merges without duplicate events',()=>{const x=ev(2,'model.start',{step:2});assert.equal(mergeActivity([x],[x,ev(1,'model.start',{step:1})]).length,2);assert.equal(mergeActivity([x],[x])[0].seq,2);});
+test('budget and downgrade reflect real events',()=>{const s=summarizeActivity([ev(1,'model.start',{step:24}),ev(2,'budget.finalizing'),ev(3,'permission.changed',{permission_mode:'safe'})]);assert.equal(s.step,24);assert.equal(s.finalizing,true);assert.equal(s.mode,'safe');});
+test('labels retain filename without interpreting HTML',()=>{assert.equal(toolLabel('project_file_read'),'读取项目文件');assert.equal(compactToolDetail({args:{path:'files/<test>.md'}}),'files/<test>.md');});
+test('bounded event memory',()=>{const x=mergeActivity([],Array.from({length:2500},(_,seq)=>ev(seq,'model.start')));assert.equal(x.length,2000);assert.equal(x[0].seq,500);});
+
+test('file progress displays verified returned range rather than repeated bare filename',()=>{assert.equal(compactToolDetail({name:'project_file_read',args:{path:'files/report.md',offset:6000,length:14000},receipt:{next_offset:12000}}),'files/report.md · 字符 6000–12000');});
+test('pending read labels requested length without claiming it has been read',()=>{assert.equal(compactToolDetail({name:'project_read_document',args:{document_id:'d_one',offset:3000,length:2000}}),'d_one · 起点 3000 / 请求 2000 字符');});

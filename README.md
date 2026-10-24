@@ -1,63 +1,140 @@
-# 共知 · Gongzhi Teamspace
+# 共知 Gongzhi — 多人与 AI 协作的共享知识工作空间
 
-A self-hosted, task-centric workspace for people and AI employees, designed around knowledge flow.
+<p align="center"><strong>让人与人、人与 AI 的每次协作，都留下可追溯、可继承、可复用的知识。</strong></p>
 
-中文：多人 × AI 员工 × 任务讨论 × 共享资料 × 可追溯的知识沉淀。
+<p align="center">
+  <a href="README.en.md">English</a> ·
+  <a href="docs/DEPLOY_ZH.md">部署指南</a> ·
+  <a href="docs/FEATURES_ZH.md">功能介绍</a> ·
+  <a href="docs/SCREENSHOTS.md">产品截图</a> ·
+  <a href="docs/KNOWLEDGE_FLOW.md">知识流转原则</a> ·
+  <a href="SECURITY.md">安全边界</a>
+</p>
 
-## Why Gongzhi / 为什么做共知
+<p align="center"><img src="docs/images/01-dashboard.webp" alt="共知团队工作台：项目、任务、日历和知识概览" width="1020"></p>
+<p align="center"><sub>真实运行界面截图 · 使用隔离的演示账号和示例数据，不包含正式用户资料</sub></p>
 
-Modern collaboration is fragmented: humans discuss in chat, AI runs in another app, tasks move to a board, and files become isolated in yet another database. Every product boundary silently discards useful context.
+## 为什么需要共知？
 
-Gongzhi takes a different foundation: one team's verified knowledge, decisions, artifacts, provenance and history should flow through people and AI tools without becoming separated islands. Work happens within a team, project, and task. A task owns a shared discussion. Agent activity and adopted knowledge remain traceable back to that task.
+聊天工具、项目看板、文件库、AI 聊天、Agent 和 MCP 各自都很强，但实际协作中，它们经常是一个个孤岛：讨论发生在聊天里，任务又要手工搬到看板；换个 Agent 就得重新解释资料；一个人或 Agent 的成果，无法自然成为可验证、可复用的组织知识。
 
-## Implemented today / 当前已实现
+**共知的出发点是知识流转，而不是再造一个聊天框。** 让团队、项目、任务、讨论、资料、执行记录与经过核验的记忆连起来。
 
-- Company/team -> project -> task -> shared multi-person conversation with presence and typing state.
-- Explicit @AI employee / @document invocation; ordinary human chat does not trigger model billing.
-- Company-level reusable agent, Skill, MCP, model, and platform-plugin configuration.
-- Bounded Octop Harness execution: streaming, approvals, stop/continue, tool receipts, nested Trace.
-- Project folders with upload, preview and FTS5/BM25 chunk search for controlled context use.
-- Original sources -> draft summary -> human confirmation -> project memory -> explicit team publication.
-- Dashboard calendar and project milestones, voice dictation into the draft only (no auto-send).
-- Browser UI with no frontend CDN dependency; Windows WSL2 or Linux single-machine deployment.
+> **团队 → 项目 → 任务 → 人与 AI 讨论 → 可核验产物 → 知识沉淀与复用。**
 
-## Current boundaries / 已知边界
+## 看看它长什么样
 
-One Agent per run; autonomous multi-agent negotiation and parallel orchestration are planned, not yet implemented. This is a base version, not a formally security-audited internet-scale multi-tenant service. SQLite and task presence state are single-instance; no multi-node HA claim. Importing untrusted Skills, external MCP, and third-party model access requires explicit authorization.
+### 多人讨论 × @AI 员工
 
-## Architecture
+在同一任务里，人可以实时讨论；只有明确 <code>@AI 员工</code>，才会启动模型。Agent 读取当前任务上下文和有权访问的项目资料；执行过程折叠在对应回复中。
 
-    Company / Team
-      Shared AI employees (model, Skill, MCP, controlled tools)
-      Projects
-        Plan, calendar, file folders, indexed knowledge
-        Tasks
-          Team chat + explicit @AI / @file
-          Model and tool execution, approvals, Trace
-          Candidate summary -> human review -> knowledge memory
-      Published team knowledge snapshots
+| 多人实时任务讨论 | 选择 AI 员工或文件 |
+|:---:|:---:|
+| [![任务内多人讨论](docs/images/07-task-discussion.webp)](docs/images/07-task-discussion.webp) | [![Agent 和文件引用](docs/images/08-mention-agents.webp)](docs/images/08-mention-agents.webp) |
 
-Read docs/KNOWLEDGE_FLOW.md and docs/ARCHITECTURE.md.
+### 专业 AI 员工 × 团队统一配置
 
-## Quick deployment (Ubuntu or Windows WSL2)
+员工在团队层管理，不用每建一个项目就复制一套：提示词、模型、Skills、MCP 和受限平台插件均可组合使用。
 
-1. Install Ubuntu (or Windows: wsl --install -d Ubuntu).
-2. Install uv using the official guide: https://docs.astral.sh/uv/getting-started/installation/
-3. Clone this repository into the Linux filesystem, not /mnt/c.
-4. From the repository root:
+| AI 员工 | Skill、MCP 与模型连接 |
+|:---:|:---:|
+| [![AI 员工配置](docs/images/05-ai-employees.webp)](docs/images/05-ai-employees.webp) | [![技能和连接](docs/images/06-skills-connectors.webp)](docs/images/06-skills-connectors.webp) |
 
-    bash app/deployment/install.sh
-    .venv/bin/python app/deployment/service.py start
-    .venv/bin/python app/deployment/service.py status
+### 任务、知识与日程互相连通
 
-Open http://127.0.0.1:47821 and create the initial administrator locally. For external access terminate HTTPS at a separately configured reverse proxy. Do not publish the local development port, database, or credential directory.
+项目文件支持目录、检索、预览和来源版本。纪要和产物经过人工审核后才成为团队知识；任务期限和跨项目安排汇总在工作台。
 
-See docs/INSTALL_WSL.md for migration and backup. See docs/CONFIGURATION.md for agent and optional ASR setup.
+| 知识与记忆 | 团队日历 |
+|:---:|:---:|
+| [![知识与记忆](docs/images/04-knowledge-memory.webp)](docs/images/04-knowledge-memory.webp) | [![团队日历](docs/images/03-team-calendar.webp)](docs/images/03-team-calendar.webp) |
 
-## License and dependencies
+[**查看全部 9 张真实产品截图 →**](docs/SCREENSHOTS.md)
 
-MIT for this repository's original code. TencentCloud/Octop runtime is used with its own MIT license, pinned upstream commit and SHA checks; other packages follow their respective licenses. See app/THIRD_PARTY_NOTICES.md and licenses/Octop-MIT.txt. No private upstream dependencies, real API keys, customer content, SSH config, or operational logs are bundled.
+## 核心功能
 
-## Contributing
+| 能力 | 当前已实现 |
+|---|---|
+| **多人协作** | 团队/成员邀请、项目、任务、真人实时聊天、在线与输入状态 |
+| **AI 员工** | 显式 @Agent / @文件、团队复用的提示词、模型、Skills、MCP 和插件 |
+| **文件和知识** | 多层文件夹、Markdown/Word/Excel/PDF 等常见格式预览、FTS5/BM25 检索、出处追溯 |
+| **AI 执行过程** | 流式、审批、执行权限设置、停止/继续、折叠 Trace、工具回执 |
+| **知识沉淀** | 讨论整理 → 待核对候选 → 人工采用 → 项目记忆 → 明确发布的公司知识 |
+| **日程和规划** | 项目计划、任务看板、负责人和期限、工作台日历、逾期提示 |
+| **语音输入** | 可选 SenseVoiceSmall，将语音转写进草稿，**不自动发送** |
+| **自托管** | Windows WSL2 / Ubuntu Linux、浏览器访问、SQLite、可自行配置 HTTPS |
 
-Contributions are welcome around source-verified memory, collaboration protocols, portable deployment, scoped tools and future multi-agent workflows. Read CONTRIBUTING.md and SECURITY.md before opening issues.
+技术栈：Python 3.12 / FastAPI / SQLite FTS5、[TencentCloud/Octop](https://github.com/TencentCloud/Octop) Harness、原生 HTML/CSS/JavaScript。了解 [技术架构](docs/ARCHITECTURE.md)。
+
+## 立即部署
+
+建议使用 **Windows 11 + WSL2 Ubuntu，或 Ubuntu 22.04/24.04 Linux**，运行在 Linux 文件系统中（不要放在 /mnt/c）。
+
+### Windows 首次安装 WSL2
+
+在管理员 PowerShell 中运行：
+
+~~~powershell
+wsl --install -d Ubuntu
+~~~
+
+初始化 Ubuntu 后，在 **Ubuntu 终端**运行以下命令。Linux 用户直接从下一步开始：
+
+~~~bash
+# 先安装 uv，参考 https://docs.astral.sh/uv/getting-started/installation/
+git clone https://github.com/luoyif/gongzhi-teamspace.git
+cd gongzhi-teamspace
+
+bash app/deployment/install.sh
+.venv/bin/python app/deployment/service.py start
+.venv/bin/python app/deployment/service.py status
+~~~
+
+打开 **http://127.0.0.1:47821**，创建第一个管理员、团队和项目。
+
+安装脚本会联网获取**固定版本 Octop** 和 Python 依赖，并校验固定源码摘要。不要把已审阅的固定版本随意替换成最新版。
+
+**图文和故障排查：** [完整中文部署说明](docs/DEPLOY_ZH.md) · [模型 / Skill / MCP / ASR 配置](docs/CONFIGURATION.md)。
+
+### 选择模型与 Agent
+
+部署后到「技能与连接 → 模型厂商」填写自己的 API 地址、Model ID、密钥；到「AI 员工」配置专家及允许工具。团队普通聊天不需要 AI。**本仓库不带真实密钥，也不包含现网数据。**
+
+## 知识如何流转？
+
+~~~text
+上传原始文件 → 版本/权限/检索索引
+      ↓
+任务里的真人讨论 + @AI员工 + @项目文件
+      ↓
+模型输出、真实工具回执、候选纪要/成果
+      ↓
+人工核对 / 采用 / 验收
+      ↓
+项目知识和记忆（可导出 Markdown）
+      ↓
+明确发布的公司共享知识 → 其他任务按权限复用
+                          → 审核形成 Skill 草稿
+~~~
+
+原件不被摘要覆盖，模型建议不冒充核验结果，跨项目资料不会因共享 Agent 身份而泄漏。[知识流转原则](docs/KNOWLEDGE_FLOW.md)。
+
+## 当前边界和发展路线
+
+**这是可自部署的基础版，不是已通过独立安全审计的大规模 SaaS。**
+
+- 一次执行一位 Agent；**多 Agent 同轮并行、Agent 间自主协商尚未实现**。
+- SQLite、在线状态与任务执行按**单实例**设计，不承诺集群高可用。
+- 无任意宿主 shell、无限运行时间或不受约束的云电脑。
+- 外部模型、语音识别及 MCP 会使用部署者自己的额度；重要写入仍需权限和审计。
+
+下一步方向：多 Agent 任务协商、可验证知识图谱、跨工具上下文迁移、离线优先、可视化工作流和完善的安全评估。
+
+## 开源与参与
+
+原创代码以 [MIT](LICENSE) 许可证发布；Octop 和其他组件按各自许可使用，参见 [第三方通知](app/THIRD_PARTY_NOTICES.md)。欢迎通过 Issue / PR 贡献和讨论。
+
+[English README](README.en.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
+
+---
+
+<p align="center"><sub>Gongzhi · Knowledge should outlive a conversation.</sub></p>

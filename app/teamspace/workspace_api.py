@@ -47,6 +47,23 @@ def task_messages(t:str,after:int=Query(0,ge=0),user:Any=Depends(current_user),s
     s=store_for(server);task=s.object(t,user.id,'task')
     return s.messages(task['project_id'],user.id,after,t)
 
+@router.get('/tasks/{t}/context-summary')
+def task_context_summary(t:str,user:Any=Depends(current_user),server:Any=Depends(get_server)):
+    from .task_memory import read_snapshot
+    s=store_for(server);task=s.object(t,user.id,'task')
+    return read_snapshot(s,task['project_id'],t,user.id)
+
+@router.post('/tasks/{t}/context-summary')
+def task_context_summary_refresh(t:str,user:Any=Depends(current_user),server:Any=Depends(get_server)):
+    from .task_memory import snapshot,read_snapshot
+    s=store_for(server);task=s.object(t,user.id,'task')
+    with s.connection() as c:
+        s.require(c,task['project_id'],user.id,write=True)
+        seqs=c.execute("SELECT seq FROM team_messages WHERE project_id=? AND json_extract(meta_json,'$.task_id')=? ORDER BY seq DESC LIMIT 12",(task['project_id'],t)).fetchall()
+    if not seqs or len(seqs)<12:return {'status':'missing','task_id':t,'message':'讨论不足，暂无需要压缩的较早消息'}
+    snapshot(s,task['project_id'],t,user.id,seqs[-1]['seq']-1)
+    return read_snapshot(s,task['project_id'],t,user.id)
+
 @router.post('/tasks/{t}/messages',status_code=201)
 async def task_send(t:str,body:dict=Body(...),user:Any=Depends(current_user),server:Any=Depends(get_server)):
     s=store_for(server);task=s.object(t,user.id,'task')

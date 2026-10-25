@@ -4,6 +4,8 @@
 
 <p align="center">
   <a href="README.md">简体中文</a> ·
+  <a href="docs/WHY_GONGZHI_EN.md">Key Differences vs QM & Ekko</a> ·
+  <a href="docs/TEST_MATRIX_EN.md">Testing</a> ·
   <a href="docs/DEPLOY_EN.md">Installation</a> ·
   <a href="docs/FEATURES_EN.md">Features</a> ·
   <a href="docs/SCREENSHOTS.md">Screenshots</a> ·
@@ -11,8 +13,14 @@
   <a href="SECURITY.md">Security</a>
 </p>
 
-<p align="center"><img src="docs/images/01-dashboard.webp" alt="Gongzhi dashboard with team projects, task status, calendar and knowledge overview" width="1020"></p>
+<p align="center"><img src="docs/images/v016/01-task-execution-desktop.webp" alt="Gongzhi dashboard with team projects, task status, calendar and knowledge overview" width="1020"></p>
 <p align="center"><sub>Actual application screenshots with an isolated demo workspace and synthetic data; no production user content.</sub></p>
+
+## What's new in v0.16?
+
+Gongzhi now has source-linked task history snapshots, explicitly **human-approved sequential handoffs between two AI employees**, and 2–8-step sequential plans with a human review gate after every agent step. All live inside the existing task conversation.
+
+[See 8 new screenshots](docs/SCREENSHOTS_V016.md) · [Compare QM, Ekko and Gongzhi honestly](docs/WHY_GONGZHI_EN.md)
 
 ## Why Gongzhi?
 
@@ -50,16 +58,24 @@ A project can organize documents in folders, search relevant indexed passages an
 
 [**Explore all 9 screenshots →**](docs/SCREENSHOTS.md)
 
+## Our Key Difference: accountability from task to knowledge
+
+QM already has strong scope isolation, versioned memory provenance, persistent computers and background workers. Ekko excels at multi-agent conversations and DAG UX. Gongzhi focuses on keeping every collaborative action under **team → project → task**, and treating an agent reply, stored Run, human acceptance, adopted document and explicitly published company snapshot as *different* audit states.
+
+That distinction makes research-to-design-to-human-review workflows verifiable and allows teams to reuse only knowledge that has been intentionally published. It is a **product default and workflow emphasis**, not a claim that the other systems lack memory, roles or provenance.
+
+Read our [comparison and limitations](docs/WHY_GONGZHI_EN.md) and [evidence-based test matrix](docs/TEST_MATRIX_EN.md).
+
 ## Features at a glance
 
 | Area | Currently implemented |
 |---|---|
 | **Human collaboration** | Team accounts, invitations, projects, task discussions, live presence and typing indicators |
-| **AI employees** | Explicit @Agent and @file mentions, reusable model/Skill/MCP/platform-tool profiles |
+| **AI employees** | Explicit @Agent and @file mentions, reusable team profiles, owner-approved bounded sequential handoffs |
 | **Files and knowledge** | Nested folders; Markdown, Word, Excel and PDF previews; provenance and FTS5/BM25 passage search |
 | **Auditable execution** | Streaming output, permission modes, approvals, stop/continue, tool receipts and collapsed Trace |
 | **Knowledge flow** | Discussion summary → pending candidates → human adoption → project memory → explicitly shared knowledge |
-| **Planning** | Task board, owner/deadline, calendar across projects and ongoing tasks highlighted on the dashboard |
+| **Planning** | Task board and calendars, plus bounded sequential task plans with explicit owner launch/review gates |
 | **Voice dictation** | Optional SenseVoiceSmall; recognized text is inserted into the draft **without auto-send** |
 | **Self-hosting** | Browser UI, Windows WSL2 / Linux, SQLite and your own HTTPS reverse proxy |
 
@@ -120,7 +136,7 @@ Source files are not overwritten by model summaries. A model suggestion is not t
 
 This is a self-hostable **base version**, not a security-certified, large-scale hosted SaaS.
 
-- **One agent per run today.** Parallel autonomous agent teams and AI-to-AI negotiation are not implemented.
+- **One agent per individual Run**; a task supports up to two owner-approved sequential handoffs. Parallel autonomous agent teams and general conditional DAGs are **not implemented**.
 - SQLite and task presence are designed for a **single-instance** runtime; there is no multi-node HA promise.
 - No unrestricted shell, cloud computer or unlimited unattended operation.
 - Third-party Skills and MCP services require review and permission; external model/ASR usage may incur charges.

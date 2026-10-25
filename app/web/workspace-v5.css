@@ -178,3 +178,213 @@ body{font-size:14px;letter-spacing:.05px}.sidebar{padding:24px 14px 14px}.brand{
 .voice-mic-button.recording{color:var(--danger);background:rgba(215,63,71,.08)}
 .voice-mic-button.recognizing svg{animation:voice-asr-spinner .8s linear infinite}
 @keyframes voice-asr-spinner{to{transform:rotate(360deg)}}
+
+/* Gongzhi Fusion: original task-centric, reusable surfaces. No Ekko assets or CSS. */
+body.gongzhi-fusion {
+ --fusion-border:var(--line);
+ --fusion-soft:var(--sidebar);
+ --fusion-focus:var(--accent);
+ --fusion-radius:14px;
+}
+.gongzhi-fusion .task-room { gap:0; border:1px solid var(--fusion-border); border-radius:15px; overflow:hidden; }
+.gongzhi-fusion .task-chat { min-width:0; }
+.gongzhi-fusion .task-context { border-left:1px solid var(--fusion-border); background:var(--surface); padding:12px 11px; }
+.gongzhi-fusion .task-context .context-section { padding:13px 8px; border-bottom:1px solid var(--fusion-border); }
+.gongzhi-fusion .context-section h3 {font-weight:650; letter-spacing:-.15px; margin-bottom:8px}
+.gongzhi-fusion .message { margin-bottom:11px; }
+.gongzhi-fusion .message-agent .message-body { border-radius:11px; }
+.gongzhi-fusion .inline-run-card { border-top:1px solid var(--fusion-border);margin-top:9px; }
+.gongzhi-fusion .fusion-panel-wrap {margin:3px 1px 12px;display:flex;flex-direction:column;gap:8px;min-width:0;}
+.gongzhi-fusion .fusion-panel-title {display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:10px;font-weight:650;letter-spacing:.65px;text-transform:uppercase;padding:0 5px;}
+.gongzhi-fusion .fusion-panel-title button{min-width:29px;height:29px}
+.gongzhi-fusion .fusion-card{border:1px solid var(--fusion-border);border-radius:var(--fusion-radius);background:var(--surface);color:var(--text);min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.035)}
+.gongzhi-fusion .fusion-card>summary{display:flex;align-items:center;gap:9px;padding:11px 10px;min-height:42px;cursor:pointer;list-style:none}
+.gongzhi-fusion .fusion-card>summary::-webkit-details-marker{display:none}
+.gongzhi-fusion .fusion-card>summary strong{font-size:12px;letter-spacing:-.1px;font-weight:600}
+.gongzhi-fusion .fusion-card>summary small{font-size:10px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.gongzhi-fusion .fusion-card>summary svg:last-child{color:var(--muted);width:13px;transition:transform .18s ease}
+.gongzhi-fusion .fusion-card[open]>summary svg:last-child{transform:rotate(90deg)}
+.gongzhi-fusion .fusion-card>summary:hover{background:var(--fusion-soft)}
+.gongzhi-fusion .fusion-card-body{border-top:1px solid var(--fusion-border);padding:11px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.gongzhi-fusion .fusion-hint{font-size:11px;line-height:1.65;color:var(--muted);overflow-wrap:anywhere;margin:0}
+.gongzhi-fusion .fusion-summary-text{white-space:pre-wrap;font-family:inherit;color:var(--text);line-height:1.65;font-size:11px;background:var(--fusion-soft);border-radius:8px;padding:10px;max-height:330px;overflow:auto;overflow-wrap:anywhere;word-break:break-word}
+.gongzhi-fusion .fusion-empty{font-size:11px;color:var(--muted);padding:9px 0}
+.gongzhi-fusion .fusion-flow-item{border:1px solid var(--fusion-border);border-radius:10px;padding:9px;background:var(--fusion-soft);min-width:0}
+.gongzhi-fusion .fusion-flow-top{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;min-width:0}
+.gongzhi-fusion .fusion-flow-top strong{font-size:11px;line-height:1.35;font-weight:650}
+.gongzhi-fusion .fusion-flow-hop{font-size:10px;white-space:nowrap;color:var(--muted)}
+.gongzhi-fusion .fusion-flow-top .badge{font-size:9px;line-height:1.3}
+.gongzhi-fusion .fusion-flow-request{font-size:11px;line-height:1.55;margin:9px 0;color:var(--text);overflow-wrap:anywhere}
+.gongzhi-fusion .fusion-flow-actions{margin-top:8px;gap:6px}
+.gongzhi-fusion .fusion-flow-actions .btn{font-size:10px;padding:5px 8px;border-radius:7px}
+.gongzhi-fusion .fusion-flow-brief{border:1px solid var(--fusion-border);background:var(--fusion-soft);border-radius:9px;padding:10px;display:flex;flex-direction:column;gap:5px}
+.gongzhi-fusion .fusion-flow-brief strong{font-size:12px}
+.gongzhi-fusion .fusion-flow-brief small{color:var(--muted)}
+.gongzhi-fusion .fusion-handoff-btn{font-size:11px;color:var(--muted);padding:5px 9px;margin:4px 0 0;align-self:flex-start;border:1px solid var(--fusion-border);border-radius:9px;background:transparent}
+.gongzhi-fusion .fusion-handoff-btn:hover{color:var(--text);background:var(--fusion-soft);border-color:var(--fusion-focus)}
+.gongzhi-fusion .fusion-handoff-btn svg{width:13px;height:13px}
+.gongzhi-fusion .task-room .composer{border-top:1px solid var(--fusion-border);border-radius:0 0 13px 13px}
+.gongzhi-fusion .task-room .composer:focus-within{border-top-color:var(--fusion-focus)}
+.gongzhi-fusion .context-section .participant{border-radius:9px}
+.gongzhi-fusion .inline-run-summary{font-size:11px}
+@media(max-width:1000px){
+ .gongzhi-fusion .task-room{border-radius:12px}
+ .gongzhi-fusion .task-context{padding:9px 7px}
+}
+@media(max-width:760px){
+ .gongzhi-fusion .task-room{border:0;border-radius:0}
+ .gongzhi-fusion .task-context{border-left:0;border-top:1px solid var(--fusion-border)}
+ .gongzhi-fusion .fusion-card-body{padding:10px}
+ .gongzhi-fusion .fusion-card>summary{padding:11px 9px}
+ .gongzhi-fusion .fusion-flow-top{align-items:flex-start}
+}
+
+/* M3 user-gated plan editing; original independent design. */
+.gongzhi-fusion .fusion-plan-meta{display:flex;flex-direction:column;gap:3px;padding:7px 2px 9px}
+.gongzhi-fusion .fusion-plan-meta strong{font-size:12px;font-weight:650;line-height:1.5}
+.gongzhi-fusion .fusion-plan-meta small{font-size:10px;color:var(--muted)}
+.gongzhi-fusion .fusion-planned-step{position:relative;background:var(--surface);border-left:3px solid var(--fusion-focus);}
+.gongzhi-fusion .fusion-plan-stepnum{display:inline-flex;justify-content:center;align-items:center;
+ width:19px;height:19px;background:var(--fusion-soft);color:var(--text);border:1px solid var(--fusion-border);
+ border-radius:6px;font-size:11px;font-weight:700;flex-shrink:0}
+.gongzhi-fusion .fusion-planned-step .fusion-flow-top{gap:5px;flex-wrap:wrap}
+.gongzhi-fusion .fusion-planned-step .fusion-flow-top strong{min-width:0;max-width:100%;word-break:break-word}
+.gongzhi-fusion .fusion-planned-step .fusion-flow-actions{display:flex;flex-wrap:wrap;align-items:center}
+.gongzhi-fusion .fusion-editor-steps{display:flex;flex-direction:column;gap:13px;max-width:100%}
+.gongzhi-fusion .fusion-editor-step{border:1px solid var(--fusion-border);border-radius:12px;padding:12px;background:var(--fusion-soft);min-width:0}
+.gongzhi-fusion .fusion-editor-step-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.gongzhi-fusion .fusion-editor-step-head strong{font-size:13px;font-weight:600}
+.gongzhi-fusion .fusion-editor-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.gongzhi-fusion .fusion-editor-fields>.field{margin:0;min-width:0}
+.gongzhi-fusion .fusion-editor-fields>.fusion-editor-prompt{grid-column:span 2}
+.gongzhi-fusion .fusion-editor-fields .input{font-size:13px;width:100%}
+.gongzhi-fusion .fusion-editor-prompt textarea{min-height:70px}
+.gongzhi-fusion .fusion-flow-item .btn{white-space:normal}
+@media(max-width:760px){
+ .gongzhi-fusion .fusion-editor-step{padding:9px}
+ .gongzhi-fusion .fusion-editor-fields{grid-template-columns:1fr;gap:7px}
+ .gongzhi-fusion .fusion-editor-fields>.fusion-editor-prompt{grid-column:span 1}
+ .gongzhi-fusion .fusion-plan-meta strong{font-size:11px}
+}
+
+/* 0.16 Gongzhi original design system: consistent hierarchy inspired by modern agent workspaces.
+   No BSL third-party selectors, assets or component code are incorporated. */
+body.gongzhi-fusion{
+ --fusion-radius-lg:15px;--fusion-radius-md:11px;--fusion-control-radius:9px;
+ --fusion-card-shadow:0 1px 2px rgba(15,25,35,.035),0 4px 16px rgba(15,25,35,.025);
+ --fusion-card-shadow-hover:0 5px 22px rgba(15,25,35,.065);
+ --fusion-header-padding-x:clamp(18px,3.4vw,43px);
+ --fusion-spacing-sm:9px;--fusion-spacing-md:15px;
+}
+:root[data-theme=dark] body.gongzhi-fusion{
+ --fusion-card-shadow:0 1px 2px rgba(0,0,0,.12),0 6px 19px rgba(0,0,0,.075);
+ --fusion-card-shadow-hover:0 8px 24px rgba(0,0,0,.16);
+}
+.gongzhi-fusion .sidebar{padding-top:16px;gap:2px}
+.gongzhi-fusion .sidebar-brand-row{padding:2px 0 11px}
+.gongzhi-fusion .company-picker{padding-bottom:11px}
+.gongzhi-fusion .company-nav{gap:4px}
+.gongzhi-fusion .company-link,
+.gongzhi-fusion .project-button{min-height:42px;border-radius:10px;transition:background-color .14s,border-color .14s;outline-offset:2px}
+.gongzhi-fusion .company-link:hover,
+.gongzhi-fusion .project-button:hover{background:var(--surface)}
+.gongzhi-fusion .company-link.active{box-shadow:inset 3px 0 var(--accent);background:var(--surface);color:var(--text)}
+.gongzhi-fusion .project-button.active{box-shadow:inset 3px 0 var(--accent);background:var(--surface);font-weight:650}
+.gongzhi-fusion .sidebar-caption{font-size:10px;font-weight:650;letter-spacing:1px;margin-top:16px}
+.gongzhi-fusion .project-header{padding-left:var(--fusion-header-padding-x);padding-right:var(--fusion-header-padding-x)}
+.gongzhi-fusion .project-title-row{gap:10px}
+.gongzhi-fusion .project-title-row h1{letter-spacing:-.6px;font-weight:700}
+.gongzhi-fusion .breadcrumbs{font-size:11px;line-height:1.5;gap:5px}
+.gongzhi-fusion .tabs{gap:22px}
+.gongzhi-fusion .tab{font-size:12px;gap:7px;letter-spacing:.02em}
+.gongzhi-fusion .content{padding-left:var(--fusion-header-padding-x);padding-right:var(--fusion-header-padding-x)}
+.gongzhi-fusion .view-head{gap:10px;margin-bottom:16px}
+.gongzhi-fusion .view-head h2{font-size:21px;letter-spacing:-.4px;font-weight:700}
+.gongzhi-fusion .view-head p{font-size:12px;max-width:72ch}
+.gongzhi-fusion .panel,
+.gongzhi-fusion .dashboard-stats .stat-card,
+.gongzhi-fusion .knowledge-pipeline,
+.gongzhi-fusion .platform-card,
+.gongzhi-fusion .managed-project,
+.gongzhi-fusion .doc-card,
+.gongzhi-fusion .task-card,
+.gongzhi-fusion .skill-card{
+ border:1px solid var(--line);
+ border-radius:var(--fusion-radius-lg);
+ background:var(--surface);
+ box-shadow:var(--fusion-card-shadow);
+ min-width:0;
+}
+.gongzhi-fusion .panel{padding:clamp(12px,1.65vw,22px)}
+.gongzhi-fusion .stat-card{padding:17px}
+.gongzhi-fusion .stat-card strong{font-weight:700;letter-spacing:-.5px}
+.gongzhi-fusion .panel h3{letter-spacing:-.22px;font-weight:650;margin-top:0}
+.gongzhi-fusion .platform-card,
+.gongzhi-fusion .managed-project,
+.gongzhi-fusion .doc-card,
+.gongzhi-fusion .task-card{
+ transition:box-shadow .16s,border-color .16s,transform .16s;
+}
+.gongzhi-fusion .platform-card:hover,
+.gongzhi-fusion .managed-project:hover,
+.gongzhi-fusion .doc-card:hover,
+.gongzhi-fusion .task-card:hover{
+ border-color:var(--accent);box-shadow:var(--fusion-card-shadow-hover);transform:translateY(-1px)
+}
+.gongzhi-fusion .task-card{border-radius:12px;padding:13px}
+.gongzhi-fusion .task-card .task-title{font-weight:620;line-height:1.5}
+.gongzhi-fusion .work-row{padding:12px 7px}
+.gongzhi-fusion .work-row:hover{border-radius:7px;background:var(--sidebar)}
+.gongzhi-fusion .badge{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:500}
+.gongzhi-fusion .btn,
+.gongzhi-fusion .input,
+.gongzhi-fusion input,
+.gongzhi-fusion select,
+.gongzhi-fusion textarea{border-radius:var(--fusion-control-radius)}
+.gongzhi-fusion .btn{transition:background-color .14s,border-color .14s,color .14s}
+.gongzhi-fusion .btn.primary{font-weight:650;box-shadow:0 1px 2px rgba(0,0,0,.045)}
+.gongzhi-fusion .input:focus-visible,
+.gongzhi-fusion textarea:focus-visible,
+.gongzhi-fusion select:focus-visible,
+.gongzhi-fusion input:focus-visible{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px}
+.gongzhi-fusion :where(.btn,.icon-btn,.tab,.company-link,.project-button,.task-card,.doc-card,
+ .fusion-card>summary,.fusion-handoff-btn):focus-visible{
+ outline:2px solid var(--accent);outline-offset:2px;
+}
+.gongzhi-fusion .modal-shell{border-radius:17px;box-shadow:0 20px 70px rgba(0,0,0,.14)}
+.gongzhi-fusion .modal-head{padding:19px 22px 14px}
+.gongzhi-fusion .modal-head h2{font-size:18px;letter-spacing:-.3px}
+.gongzhi-fusion .modal-body{padding:18px 22px}
+.gongzhi-fusion .modal-footer{padding:14px 22px;border-top:1px solid var(--line)}
+.gongzhi-fusion .modal-body .field{margin-bottom:14px}
+.gongzhi-fusion .notifications{z-index:200}
+.gongzhi-fusion .composer{border-radius:13px;border-color:var(--line)}
+.gongzhi-fusion .message-meta{font-size:11px}
+.gongzhi-fusion .message .markdown p{margin-bottom:6px}
+.gongzhi-fusion .message .markdown{line-height:1.66}
+.gongzhi-fusion .calendar-widget .calendar-day{border-radius:5px}
+@media(max-width:1000px){
+ .gongzhi-fusion .view-head h2{font-size:19px}
+ .gongzhi-fusion .project-header{padding-left:18px;padding-right:18px}
+ .gongzhi-fusion .content{padding-left:18px;padding-right:18px}
+ .gongzhi-fusion .dashboard-stats{gap:10px}
+}
+@media(max-width:760px){
+ .gongzhi-fusion .sidebar{padding:16px 14px}
+ .gongzhi-fusion .project-header{padding:16px 12px 6px}
+ .gongzhi-fusion .content{padding:12px 12px}
+ .gongzhi-fusion .view-head h2{font-size:18px}
+ .gongzhi-fusion .panel{padding:13px}
+ .gongzhi-fusion .modal-shell{border-radius:12px}
+ .gongzhi-fusion .modal-head{padding:14px}
+ .gongzhi-fusion .modal-body{padding:12px}
+ .gongzhi-fusion .modal-footer{padding:11px}
+ .gongzhi-fusion .tabs{gap:16px}
+ .gongzhi-fusion .badge{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+ .gongzhi-fusion .platform-card,
+ .gongzhi-fusion .managed-project,
+ .gongzhi-fusion .doc-card,
+ .gongzhi-fusion .task-card{transition:none;transform:none!important}
+}

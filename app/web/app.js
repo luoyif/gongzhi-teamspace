@@ -2245,4 +2245,493 @@ renderCompanyContent=function(){
  if(anchor)anchor.before(section);else content.append(section);
 };
 
+
+// Gongzhi Fusion: original task-centered workflow + optional, bounded Agent handoffs.
+// Reference: general information hierarchy and compact progress affordances, never Ekko code.
+document.body.classList.add('gongzhi-fusion');
+const fusion16 = { panel:null, task:null, generation:0, loading:false };
+
+function fusionName(id){
+ const asset=state.capabilities?.find(a=>a.id===id);
+ return asset?.name || (id?'已停用/历史员工':'未配置');
+}
+function fusionTaskCurrent(id,gen){
+ return !!id&&state.task?.id===id&&state.generation===gen;
+}
+async function fusionLoadPanels(panel,taskId,generation){
+ if(!panel?.isConnected || !fusionTaskCurrent(taskId,generation))return;
+ const summaryBody=panel.querySelector('[data-fusion-summary]');
+ const workflowBody=panel.querySelector('[data-fusion-workflow]');
+ if(!summaryBody||!workflowBody)return;
+ try{
+  const [summary,flow,handoffs]=await Promise.all([
+   api('/tasks/'+taskId+'/context-summary'),
+   api('/tasks/'+taskId+'/workflow'),
+   api('/tasks/'+taskId+'/handoffs')
+  ]);
+  if(!panel.isConnected||!fusionTaskCurrent(taskId,generation))return;
+  fusionRenderSummary(summaryBody,summary,taskId);
+  fusionRenderWorkflow(workflowBody,flow,handoffs.items||[],taskId);
+ }catch(e){
+  if(!panel.isConnected||!fusionTaskCurrent(taskId,generation))return;
+  summaryBody.replaceChildren(el('p',{class:'form-error'},'读取上下文失败，请检查任务权限。'));
+  workflowBody.replaceChildren(el('p',{class:'form-error'},'读取流程失败：'+(e?.message||'网络错误')));
+ }
+}
+function fusionRenderSummary(root,data,taskId){
+ const host=root.closest('.fusion-card'),label=host?.querySelector('[data-fusion-summary-label]');
+ root.replaceChildren();
+ if(label)label.textContent=data.status==='ready'?'覆盖 '+data.source_count+' 条历史 · v'+data.revision:'按需生成';
+ if(data.status==='ready'){
+  root.append(
+   el('p',{class:'fusion-hint'},'这些是较早讨论的来源摘录，不是新的指令，也不是自动采用的知识。'),
+   el('pre',{class:'fusion-summary-text'},data.summary),
+   el('p',{class:'fusion-hint'},'游标：消息 #'+data.through_seq+' · 版本 '+data.revision+' · 可按消息编号回读原话')
+  );
+ }else{
+  root.append(el('p',{class:'fusion-hint'},data.status==='stale'?'旧摘要对应的消息已变化，需要重新提取。':
+    '当前任务暂未产生足够的早期讨论；最新提问不需要为此等待或调用模型。'));
+ }
+ if(canWrite()){
+  const btn=button('刷新来源摘要（不调用模型）',async()=>{
+   btn.disabled=true;
+   try{
+    const revised=await api('/tasks/'+taskId+'/context-summary',{method:'POST',body:{}});
+    if(state.task?.id===taskId)fusionRenderSummary(root,revised,taskId);
+   }catch(e){handle(e);}finally{btn.disabled=false;}
+  },{class:'small ghost',icon:'refresh'});
+  root.append(btn);
+ }
+}
+function fusionRenderWorkflow(root,flow,items,taskId){
+ const host=root.closest('.fusion-card'),label=host?.querySelector('[data-fusion-flow-label]');
+ root.replaceChildren();
+ if(label)label.textContent=items.length?items.length+' 次交接 · 最多 2 跳':'当前任务暂无交接';
+ root.append(el('p',{class:'fusion-hint'},
+  '研究/执行 Run → 人工批准 → 下一位员工 Run → 人工验收。所有阶段都归属本任务。流程是已发生操作的视图，不会自动发布知识或启动更多员工。'));
+ if(!items.length){
+  root.append(el('p',{class:'fusion-empty'},'从某位 AI 员工已经完成的回复下方，点击「转交另一位员工」开始。'));
+  return;
+ }
+ const nodes=new Map((flow.nodes||[]).map(n=>[n.handoff_id,n]));
+ for(const item of [...items].reverse()){
+  const node=nodes.get(item.id),stateText={
+   pending:'等待管理员批准',approved:'已批准，目标运行 '+(node?.target_run_status||'已安排'),
+   rejected:'已拒绝',cancelled:'已取消',dispatching:'正在确认执行状态'
+  }[item.status]||item.status;
+  const row=el('section',{class:'fusion-flow-item'},
+   el('div',{class:'fusion-flow-top'},el('span',{class:'fusion-flow-hop'},'第 '+item.hop+' 跳'),
+    el('strong',{},fusionName(item.source_agent_id)+' → '+fusionName(item.target_agent_id)),
+    el('span',{class:'grow'}),badge(stateText)),
+   el('p',{class:'fusion-flow-request'},item.instruction),
+   el('small',{class:'fusion-hint'},'源 Run '+item.source_run_id.slice(0,12)+' · 始终保留人工审批与来源'),
+   el('div',{class:'fusion-flow-actions row wrap'})
+  );
+  const actions=row.querySelector('.fusion-flow-actions');
+  actions.append(button('查看来源',()=>openTrace(item.source_run_id),{class:'small ghost'}));
+  if(item.target_run_id)actions.append(button('查看接力结果',()=>openTrace(item.target_run_id),{class:'small ghost'}));
+  if(item.status==='pending'){
+   if(isOwner()){
+    actions.append(button('批准并运行',()=>fusionApprove(taskId,item),{class:'small primary'}));
+    actions.append(button('拒绝',()=>fusionReject(taskId,item.id),{class:'small ghost'}));
+   }else if(Number(item.requested_by)===Number(state.user?.id)){
+    actions.append(button('撤销申请',()=>fusionCancel(taskId,item.id),{class:'small ghost'}));
+   }else{
+    actions.append(el('span',{class:'fusion-hint'},'等待项目管理员操作'));
+   }
+  }else if(item.status==='dispatching'){
+   actions.append(el('small',{class:'fusion-hint'},'不自动重发；请核对源 Run 与目标 Run 后人工处理'));
+   if(isOwner())actions.append(button('核对发送状态',()=>confirmAction('核对接力发送中记录','只检查持久化的相同 Run，不会创建新模型请求。',async()=>{
+    try{await api('/tasks/'+taskId+'/handoffs/'+item.id+'/reconcile',{method:'POST',body:{}});await fusionReloadPanels();toast('接力发送状态已核对，未自动重发模型');}
+    catch(e){handle(e);await fusionReloadPanels();}
+   }),{class:'small ghost'}));
+  }
+  root.append(row);
+ }
+}
+async function fusionReloadPanels(){
+ const panel=fusion16.panel;
+ if(panel&&fusionTaskCurrent(fusion16.task,fusion16.generation))
+  await fusionLoadPanels(panel,fusion16.task,fusion16.generation);
+}
+async function fusionApprove(taskId,item){
+ confirmAction('批准跨员工任务交接',
+  '将创建一条新的安全模式 Agent Run。目标员工只使用当前项目权限和历史来源回执；可能消耗模型额度，拒绝或断网不会自动重发。',
+  async()=>{
+   try{
+    const out=await api('/tasks/'+taskId+'/handoffs/'+item.id+'/approve',{method:'POST',body:{}});
+    toast('已启动目标 AI 员工，正在保存独立执行回执。');
+    await fusionReloadPanels();
+    if(out.target_run_id&&state.task?.id===taskId){
+     const runs=await api(projectPath('/runs'));
+     state.runs=runs.items;
+     followAgentRun(out.target_run_id);
+     syncInlineRuns11();
+    }
+   }catch(e){handle(e);await fusionReloadPanels();}
+  });
+}
+function fusionReject(taskId,id){
+ confirmAction('拒绝接力申请','这次申请不会调用模型，源运行和聊天历史仍保留。',async()=>{
+  try{await api('/tasks/'+taskId+'/handoffs/'+id+'/reject',{method:'POST',body:{}});await fusionReloadPanels();toast('交接已拒绝');}catch(e){handle(e);}
+ });
+}
+function fusionCancel(taskId,id){
+ confirmAction('撤销交接申请','仅撤销尚未被批准的请求，不修改原始 Run。',async()=>{
+  try{await api('/tasks/'+taskId+'/handoffs/'+id+'/cancel',{method:'POST',body:{}});await fusionReloadPanels();toast('已撤销');}catch(e){handle(e);}
+ });
+}
+function fusionOpenHandoff(record){
+ if(!state.task||record.meta.status!=='completed')return;
+ const agents=(state.capabilities||[]).filter(a=>a.kind==='agent'&&a.enabled&&a.id!==record.meta.agent_id);
+ if(!agents.length){toast('需要先在 AI 员工中启用第二位可用专家',true);return;}
+ const taskId=state.task.id;
+ const selector=el('select',{class:'input','aria-label':'目标AI员工'},
+  agents.map(a=>el('option',{value:a.id},a.name)));
+ const instruction=el('textarea',{class:'input',rows:4,maxlength:1500,
+  'aria-label':'交接目标',placeholder:'明确说明要请第二位员工完成什么、如何验收，避免重复写入已有成果。'});
+ const help=el('p',{class:'fusion-hint'},
+  '仅当前任务、当前授权范围。一次接力最多两跳；必须由项目管理员批准后才调用目标模型。源 Run 的工具回执和资料版本可核查。');
+ const root=el('div',{class:'stack'},
+  el('div',{class:'fusion-flow-brief'},el('strong',{},'来源：'+fusionName(record.meta.agent_id)),
+   el('small',{},' Run '+record.id.slice(0,16)+' · 已完成但产物仍待人工验收')),
+  el('label',{class:'field'},'接收的 AI 员工',selector),
+  el('label',{class:'field'},'本次交接目标',instruction),help);
+ const dialog=openDialog('向另一位 AI 员工交接 · 当前任务',root,{wide:true});
+ dialog.dialog.querySelector('.modal-shell')?.append(dialog.footer);
+ const submit=button('提交人工审批',async()=>{
+  const text=instruction.value.trim();
+  if(!text){toast('请明确写出本次交接目标',true);instruction.focus();return;}
+  submit.disabled=true;
+  try{
+   await api('/tasks/'+taskId+'/handoffs',{method:'POST',
+    body:{source_run_id:record.id,target_agent_id:selector.value,instruction:text}});
+   dialog.close();toast('交接请求已记录，等待管理员批准；不会自动调用模型');
+   await fusionReloadPanels();
+  }catch(e){handle(e);submit.disabled=false;}
+ },{class:'primary'});
+ dialog.footer.append(button('取消',()=>dialog.close(),{class:'ghost'}),submit);
+}
+const previousTaskContextFusion=taskContextPanel;
+taskContextPanel=function(){
+ const panel=previousTaskContextFusion();
+ if(!state.task)return panel;
+ // Keep the right rail task-centric. Agent management stays in the global Employee page.
+ for(const section of panel.querySelectorAll('.context-section')){
+  if(section.querySelector('h3')?.textContent==='助手上下文')section.remove();
+ }
+ const wrapper=el('div',{class:'fusion-panel-wrap'});
+ const summary=el('details',{class:'fusion-card'},
+  el('summary',{},icon('files',15),el('strong',{},'持续上下文'),
+   el('small',{'data-fusion-summary-label':''},'读取状态'),icon('chevron',14)),
+  el('div',{class:'fusion-card-body','data-fusion-summary':''},el('p',{class:'muted'},'正在读取来源状态…')));
+ const workflow=el('details',{class:'fusion-card'},
+  el('summary',{},icon('plan',15),el('strong',{},'员工接力与任务流程'),
+   el('small',{'data-fusion-flow-label':''},'读取记录'),icon('chevron',14)),
+  el('div',{class:'fusion-card-body','data-fusion-workflow':''},el('p',{class:'muted'},'正在读取真实执行记录…')));
+ const refresh=iconButton('refresh','刷新上下文与接力',()=>fusionReloadPanels());
+ wrapper.append(el('div',{class:'fusion-panel-title'},el('span',{},'任务执行与知识'),refresh),summary,workflow);
+ panel.insertBefore(wrapper,panel.querySelector('.context-section:nth-of-type(2)')||panel.firstChild);
+ fusion16.panel=panel;fusion16.task=state.task.id;fusion16.generation=state.generation;
+ queueMicrotask(()=>fusionLoadPanels(panel,fusion16.task,fusion16.generation));
+ return panel;
+};
+const previousPaintFusion=paintInlineRun11;
+paintInlineRun11=function(record){
+ previousPaintFusion(record);
+ const card=document.querySelector('[data-inline-run="'+record.id+'"]');
+ if(!card)return;
+ let action=card.parentElement?.querySelector('[data-fusion-handoff="'+record.id+'"]');
+ const reply=state.messages.find(m=>m.run_id===record.id);
+ const parent=card.closest('.message-body');
+ if(record.meta.status==='completed'&&record.meta.agent_id&&reply&&parent&&canWrite()){
+  if(!action){
+   action=button('转交给另一位 AI 员工',()=>fusionOpenHandoff(record),{class:'fusion-handoff-btn small ghost',icon:'users'});
+   action.setAttribute('data-fusion-handoff',record.id);
+   parent.append(action);
+  }
+ }else action?.remove();
+};
+// The live SSE sends tiny notifications; re-fetch only handoff metadata.
+const previousRefreshFromLiveFusion=refreshFromLive14;
+refreshFromLive14=async function(){
+ await previousRefreshFromLiveFusion();
+ // The task data panel is on demand; only refresh it when user expanded it.
+ if(fusion16.panel?.querySelector('.fusion-card[open]'))fusionReloadPanels().catch(()=>{});
+};
+
+
+// Fusion M3: real, task-local, user-controlled sequential plan, not a fake DAG.
+function fusionSafeOwner(){return !!state.task&&isOwner();}
+function fusionPlanUrl(taskId){return '/tasks/'+encodeURIComponent(taskId)+'/plan';}
+const fusionPlanLabels={
+ pending:'待开始',dispatching:'正在准备执行',running:'执行中',
+ needs_review:'待核验',accepted:'已人工核验',blocked:'失败 / 已暂停',
+ rejected:'已拒绝'
+};
+async function fusionLoadPlan(host,tid,generation){
+ if(!host?.isConnected||!fusionTaskCurrent(tid,generation))return;
+ try{
+  const plan=await api(fusionPlanUrl(tid));
+  if(host.isConnected&&fusionTaskCurrent(tid,generation))
+   fusionRenderPlan(host,plan,tid);
+ }catch(e){
+  if(host.isConnected&&fusionTaskCurrent(tid,generation))
+   host.replaceChildren(el('p',{class:'form-error'},'读取任务执行计划失败，请检查网络与权限。'));
+ }
+}
+function fusionPlanRefresh(){
+ const host=fusion16.panel?.querySelector('[data-fusion-plan]');
+ if(host&&fusion16.task&&fusion16.generation===state.generation)
+   return fusionLoadPlan(host,fusion16.task,fusion16.generation);
+}
+function fusionPlanDialog(previous=null){
+ if(!state.task)return;
+ if(!fusionSafeOwner()){toast('只有当前项目管理员能创建或修改流程计划',true);return;}
+ const agents=(state.capabilities||[]).filter(x=>x.kind==='agent'&&x.enabled);
+ if(!agents.length){toast('请先在公司「AI 员工」中启用一位专家',true);return;}
+ const steps=previous?.steps?.map(x=>({
+   kind:x.kind,title:x.title,instruction:x.instruction,agent_id:x.agent_id
+ }))||[
+  {kind:'agent',title:'研究与资料核查',instruction:'阅读授权资料，提炼有来源的事实、限制与未决问题。',agent_id:agents[0].id},
+  {kind:'agent',title:'设计或开发方案',instruction:'结合上一步已核验结果形成可审阅的实施方案，不重复写入业务对象。',agent_id:agents[1]?.id||agents[0].id},
+  {kind:'review',title:'人工核验成果',instruction:'核对模型输出、文件版本和真实工具回执；未经人工批准不宣布已完成。'}
+ ];
+ const title=el('input',{class:'input',maxlength:160,required:true,value:previous?.title||'研究 → 方案 → 人工审核',
+  'aria-label':'流程名称'});
+ const description=el('textarea',{class:'input',rows:2,maxlength:1000,
+  'aria-label':'流程目标',placeholder:'说明本次计划的目标、交付边界和验收对象。',
+  value:previous?.description||'所有步骤都归属当前任务；每次调用模型前需人明确确认。'});
+ const list=el('div',{class:'fusion-editor-steps'});
+ const draw=()=>{
+  list.replaceChildren();
+  steps.forEach((s,index)=>{
+   const kind=el('select',{class:'input','aria-label':'步骤类型'+(index+1)},[
+    el('option',{value:'agent',selected:s.kind==='agent'},'AI 员工执行'),
+    el('option',{value:'review',selected:s.kind==='review'},'真人验收')
+   ]);
+   const name=el('input',{class:'input',value:s.title,maxlength:120,'aria-label':'步骤名称'+(index+1)});
+   const instruction=el('textarea',{class:'input',rows:3,maxlength:1200,
+       'aria-label':'步骤要求'+(index+1)},s.instruction);
+   const who=el('select',{class:'input','aria-label':'步骤执行员工'+(index+1)},
+    agents.map(a=>el('option',{value:a.id,selected:a.id===s.agent_id},a.name)));
+   const fields=el('div',{class:'fusion-editor-fields'},
+    el('label',{class:'field'},'类型',kind),
+    el('label',{class:'field'},'名称',name),
+    el('label',{class:'field'},'执行员工',who),
+    el('label',{class:'field fusion-editor-prompt'},'目标与验收要求',instruction));
+   who.disabled=s.kind==='review';who.closest('label').hidden=s.kind==='review';
+   kind.addEventListener('change',()=>{
+    s.kind=kind.value;s.agent_id=s.kind==='agent'?(s.agent_id||agents[0].id):null;
+    draw();
+   });
+   name.addEventListener('input',()=>s.title=name.value);
+   instruction.addEventListener('input',()=>s.instruction=instruction.value);
+   who.addEventListener('change',()=>s.agent_id=who.value);
+   const actions=el('div',{class:'fusion-editor-step-actions'});
+   if(steps.length>2 && index!==steps.length-1)
+    actions.append(button('移除',()=>{steps.splice(index,1);draw();},{class:'small ghost'}));
+   list.append(el('section',{class:'fusion-editor-step'},
+    el('div',{class:'fusion-editor-step-head'},el('strong',{},'步骤 '+(index+1)),actions),fields));
+  });
+ };
+ draw();
+ const add=button('增加执行步骤',()=>{
+  if(steps.length>=8){toast('最多支持8项受控步骤',true);return;}
+  steps.splice(steps.length-1,0,{kind:'agent',title:'追加核查',instruction:'核对前一阶段的已验收成果，输出可核对的结论。',agent_id:agents[0].id});
+  draw();
+ },{class:'small ghost',icon:'plus'});
+ const content=el('div',{class:'stack'},el('p',{class:'fusion-hint'},
+   '这不是无约束自动运行的流程图：每个 Agent 步骤必须由管理员点击启动，成功后由真人核验；最后一项始终为人工审核。'),
+  el('label',{class:'field'},'流程名称',title),
+  el('label',{class:'field'},'目标说明',description),
+  list,add,
+  el('p',{class:'fusion-hint'},'创建/编辑计划不会调用大模型、不会修改已采用知识，历史已有运行不能被静默替换。'));
+ const dlg=openDialog(previous?'编辑未开始的执行计划':'制定任务执行计划',content,{wide:true});
+ dlg.dialog.querySelector('.modal-shell').append(dlg.footer);
+ const submit=button(previous?'保存修订':'创建计划',async()=>{
+  const body={title:title.value.trim(),description:description.value.trim(),
+    steps:steps.map(x=>({kind:x.kind,title:x.title.trim(),instruction:x.instruction.trim(),
+      ...(x.kind==='agent'?{agent_id:x.agent_id}: {})}))};
+  if(!body.title||body.steps.some(s=>!s.title||!s.instruction)){toast('步骤名称和说明均不能为空',true);return;}
+  if(body.steps.at(-1).kind!=='review'){toast('最后一步必须由真人审核',true);return;}
+  submit.disabled=true;
+  try{
+   if(previous)body.expected_revision=previous.revision;
+   await api(fusionPlanUrl(state.task.id),{method:previous?'PUT':'POST',body});
+   dlg.close();await fusionPlanRefresh();
+   toast('任务流程已保存。启动每一步仍须管理员确认。');
+  }catch(e){handle(e);submit.disabled=false;}
+ },{class:'primary'});
+ dlg.footer.append(button('取消',()=>dlg.close(),{class:'ghost'}),submit);
+}
+async function fusionTriggerPlan(tid,sid,kind){
+ const endpoint=fusionPlanUrl(tid)+'/steps/'+sid+'/'+kind;
+ let note='';
+ if(kind==='start'){
+  confirmAction('启动本阶段 AI 员工',
+   '启动后将运行真实模型，可能消耗额度。仍使用该员工已配置的权限与安全审批，失败不会自动重试。',async()=>{
+    try{
+     const result=await api(endpoint,{method:'POST',body:{}});
+     await fusionPlanRefresh();
+     const step=result.steps.find(x=>x.id===sid);
+     if(step?.run_id)followAgentRun(step.run_id);
+     toast('已启动独立 Run，执行过程留在本任务讨论。');
+    }catch(e){handle(e);await fusionPlanRefresh();}
+   });
+  return;
+ }
+ if(kind==='reconcile'){
+  confirmAction('人工核对发送中步骤','系统只查询本任务已入库的同一 Run，不会调用模型；如果尚无 Run，会恢复为待开始，仍需你再次确认启动。',async()=>{
+   try{await api(endpoint,{method:'POST',body:{}});await fusionPlanRefresh();toast('发送状态已人工核对，未自动重发模型请求。');}
+   catch(e){handle(e);await fusionPlanRefresh();}
+  });
+  return;
+ }
+ const messages={approve:'请写明实际核查到的内容与验收结果，不得直接将模型建议冒充完成。',
+  retry:'旧失败记录会保留；再次执行可能消耗模型额度。必须写明复跑原因。'};
+ const text=el('textarea',{class:'input',rows:4,maxlength:1200,
+  'aria-label':kind==='approve'?'人工核验说明':'重新执行原因',
+  placeholder:kind==='approve'?'核查了哪些 Run、文件和交付物？为何允许下一步？':'上一轮出了什么问题，为什么明确允许再次运行？'});
+ const dlg=openDialog(kind==='approve'?'人工核验步骤':'确认重试失败步骤',
+  el('div',{class:'stack'},el('p',{class:'fusion-hint'},messages[kind]),text),{wide:true});
+ dlg.dialog.querySelector('.modal-shell').append(dlg.footer);
+ const go=button(kind==='approve'?'确认步骤已核验':'记录原因并准备重试',async()=>{
+  if(text.value.trim().length<8){toast('请填写至少8个字的检查记录',true);return;}
+  go.disabled=true;
+  try{
+   await api(endpoint,{method:'POST',body:kind==='approve'?{note:text.value.trim()}:{reason:text.value.trim()}});
+   dlg.close();await fusionPlanRefresh();
+   toast(kind==='approve'?'此步骤已由管理员核验；并不自动发布团队知识。':'失败步骤已重置为待开始，不会自动发起模型调用。');
+  }catch(e){handle(e);go.disabled=false;}
+ },{class:'primary'});
+ dlg.footer.append(button('取消',()=>dlg.close(),{class:'ghost'}),go);
+}
+function fusionRenderPlan(root,plan,tid){
+ const container=root.closest('.fusion-card');
+ const caption=container?.querySelector('[data-fusion-plan-caption]');
+ root.replaceChildren();
+ if(caption)caption.textContent=plan.status==='missing'?'未创建':(plan.status==='completed'?'已核验完成':plan.steps.filter(s=>s.status==='accepted').length+'/'+plan.steps.length+' 步完成');
+ if(plan.status==='missing'){
+  root.append(el('p',{class:'fusion-hint'},'为复杂工作建立明确的执行步骤，每次模型执行和人工核验都附着在当前任务。'));
+  if(fusionSafeOwner())root.append(button('制定执行计划',()=>fusionPlanDialog(),{class:'small primary',icon:'plus'}));
+  return;
+ }
+ root.append(el('div',{class:'fusion-plan-meta'},el('strong',{},plan.title),
+  el('small',{},'计划 v'+plan.revision+' · '+plan.steps.length+' 步 · '+(plan.status==='completed'?'全部已核验':'等待逐步执行'))));
+ if(plan.description)root.append(el('p',{class:'fusion-hint'},plan.description));
+ const allPending=plan.steps.every(s=>s.status==='pending');
+ if(fusionSafeOwner()&&allPending)
+  root.append(button('编辑计划',()=>fusionPlanDialog(plan),{class:'small ghost',icon:'edit'}));
+ for(let i=0;i<plan.steps.length;i++){
+  const step=plan.steps[i],status=step.effective_status||step.status;
+  const previousReady=i===0||plan.steps.slice(0,i).every(x=>x.status==='accepted');
+  const card=el('section',{class:'fusion-flow-item fusion-planned-step'},
+   el('div',{class:'fusion-flow-top'},
+    el('span',{class:'fusion-plan-stepnum'},String(i+1)),
+    el('strong',{},step.title),
+    el('span',{class:'grow'}),
+    badge(fusionPlanLabels[status]||status)),
+   el('p',{class:'fusion-flow-request'},step.instruction),
+   el('small',{class:'fusion-hint'},step.kind==='agent'
+    ?('AI · '+fusionName(step.agent_id)+' · Agent配置 v'+step.agent_revision)
+    :'真人审核（不自动发布知识）'),
+   el('div',{class:'fusion-flow-actions row wrap'}));
+  const actions=card.querySelector('.fusion-flow-actions');
+  if(step.run_id){
+   actions.append(button('查看 Run',()=>openTrace(step.run_id),{class:'small ghost'}));
+   if(step.known_total_tokens!=null)actions.append(el('small',{class:'fusion-hint'},'已知累计 '+step.known_total_tokens+' token'));
+  }
+  if(step.review_note)actions.append(el('small',{class:'fusion-hint'},'人工记录：'+step.review_note));
+  if(fusionSafeOwner()&&previousReady){
+   if(step.kind==='agent'&&step.status==='pending')
+    actions.append(button('启动员工执行',()=>fusionTriggerPlan(tid,step.id,'start'),{class:'small primary'}));
+   if(status==='needs_review'||(step.kind==='review'&&step.status==='pending'))
+    actions.append(button('人工核验',()=>fusionTriggerPlan(tid,step.id,'approve'),{class:'small primary'}));
+   if(status==='blocked')
+    actions.append(button('明确重试',()=>fusionTriggerPlan(tid,step.id,'retry'),{class:'small ghost'}));
+   if(status==='dispatching')
+    actions.append(button('人工核对发送状态',()=>fusionTriggerPlan(tid,step.id,'reconcile'),{class:'small ghost'}));
+  }else if(!previousReady)actions.append(el('small',{class:'fusion-hint'},'前面的步骤尚未核验完成'));
+  root.append(card);
+ }
+ root.append(el('p',{class:'fusion-hint'},'⚑ 当前为有界的线性流程；不会自动开始下一步，也不会自行将知识发布到公司。复杂分支 DAG 仍是后续阶段。'));
+}
+const fusionOriginalLoadPanels= fusionLoadPanels;
+fusionLoadPanels=async function(panel,tid,generation){
+ await fusionOriginalLoadPanels(panel,tid,generation);
+ const host=panel?.querySelector('[data-fusion-plan]');
+ if(host)await fusionLoadPlan(host,tid,generation);
+};
+const fusionOriginalTaskPanel=taskContextPanel;
+taskContextPanel=function(){
+ const panel=fusionOriginalTaskPanel();
+ if(!state.task)return panel;
+ const root=panel.querySelector('.fusion-panel-wrap');
+ if(root){
+  const plan=el('details',{class:'fusion-card'},
+   el('summary',{},icon('plan',15),el('strong',{},'任务执行计划'),
+    el('small',{'data-fusion-plan-caption':''},'读取计划'),icon('chevron',14)),
+   el('div',{class:'fusion-card-body','data-fusion-plan':''},
+    el('p',{class:'fusion-hint'},'正在读取执行步骤…')));
+  root.insertBefore(plan,root.querySelector('.fusion-card:nth-of-type(2)'));
+ }
+ return panel;
+};
+
+// M4 responsiveness: no context/workflow fetch until the member opens that panel.
+function fusionVisibleCurrent(panel,tid,generation){
+ return !!panel?.isConnected&&fusionTaskCurrent(tid,generation);
+}
+fusionLoadPanels=async function(panel,tid,generation){
+ if(!fusionVisibleCurrent(panel,tid,generation))return;
+ const tasks=[];
+ const summary=panel.querySelector('.fusion-card:has([data-fusion-summary])');
+ if(summary?.open){
+  const body=summary.querySelector('[data-fusion-summary]');
+  tasks.push(api('/tasks/'+tid+'/context-summary').then(data=>{
+   if(fusionVisibleCurrent(panel,tid,generation)&&summary.open)fusionRenderSummary(body,data,tid);
+  }).catch(e=>{
+   if(fusionVisibleCurrent(panel,tid,generation)&&summary.open)
+    body.replaceChildren(el('p',{class:'form-error'},'读取历史来源失败，可关闭后重新展开。'));
+  }));
+ }
+ const workflow=panel.querySelector('.fusion-card:has([data-fusion-workflow])');
+ if(workflow?.open){
+  const body=workflow.querySelector('[data-fusion-workflow]');
+  tasks.push(Promise.all([api('/tasks/'+tid+'/workflow'),api('/tasks/'+tid+'/handoffs')]).then(([data,handoffs])=>{
+   if(fusionVisibleCurrent(panel,tid,generation)&&workflow.open)
+    fusionRenderWorkflow(body,data,handoffs.items||[],tid);
+  }).catch(e=>{
+   if(fusionVisibleCurrent(panel,tid,generation)&&workflow.open)
+    body.replaceChildren(el('p',{class:'form-error'},'读取员工接力失败，可重新展开查看。'));
+  }));
+ }
+ const plan=panel.querySelector('.fusion-card:has([data-fusion-plan])');
+ if(plan?.open){
+  const body=plan.querySelector('[data-fusion-plan]');
+  tasks.push(api(fusionPlanUrl(tid)).then(data=>{
+   if(fusionVisibleCurrent(panel,tid,generation)&&plan.open)
+    fusionRenderPlan(body,data,tid);
+  }).catch(e=>{
+   if(fusionVisibleCurrent(panel,tid,generation)&&plan.open)
+    body.replaceChildren(el('p',{class:'form-error'},'读取执行计划失败，请刷新重试。'));
+  }));
+ }
+ await Promise.all(tasks);
+};
+const fusionTaskPanelBeforeLazy=taskContextPanel;
+taskContextPanel=function(){
+ const panel=fusionTaskPanelBeforeLazy();
+ if(state.task){
+  const tid=state.task.id,generation=state.generation;
+  for(const detail of panel.querySelectorAll('details.fusion-card')){
+   detail.addEventListener('toggle',()=>{
+    if(detail.open)fusionLoadPanels(panel,tid,generation).catch(()=>{});
+   });
+  }
+ }
+ return panel;
+};
+
 bootstrap();

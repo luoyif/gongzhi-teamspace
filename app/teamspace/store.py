@@ -151,6 +151,12 @@ class Store:
             c.executescript(SCHEMA)
             from .file_folders import SCHEMA as FILE_FOLDER_SCHEMA
             c.executescript(FILE_FOLDER_SCHEMA)
+            from .task_memory import SCHEMA as TASK_CONTEXT_SCHEMA
+            c.executescript(TASK_CONTEXT_SCHEMA)
+            from .agent_handoff import SCHEMA as TASK_HANDOFF_SCHEMA
+            c.executescript(TASK_HANDOFF_SCHEMA)
+            from .task_workflows import SCHEMA as TASK_WORKFLOW_SCHEMA
+            c.executescript(TASK_WORKFLOW_SCHEMA)
             c.execute("UPDATE team_runs SET status='interrupted',error='服务重启；未自动重发模型请求，请确认后重试',finished_at=? WHERE status IN ('queued','running')", (now(),))
             # Exports are rebuildable and intentionally omitted from backups.
             # A restored database must regenerate them without a user edit.

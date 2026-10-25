@@ -217,7 +217,7 @@ def build_team_app(server: Any):
 
     from . import api
 
-    app = FastAPI(title="共知 · Teamspace", version="0.15.0", docs_url=None,
+    app = FastAPI(title="共知 · Teamspace", version="0.16.0", docs_url=None,
                   redoc_url=None, openapi_url=None)
     app.state.octop_server = server
     _install_exception_handlers(app)
@@ -279,6 +279,10 @@ def build_team_app(server: Any):
     app.include_router(task_live_router,prefix='/api/team')
     from .speech_input import router as speech_router
     app.include_router(speech_router,prefix='/api/team')
+    from .agent_handoff import router as handoff_router
+    app.include_router(handoff_router,prefix='/api/team')
+    from .task_workflows import router as task_workflow_router
+    app.include_router(task_workflow_router,prefix='/api/team')
     api.install_lifecycle(app, server)
 
     @app.get("/api/setup/status")
@@ -288,13 +292,13 @@ def build_team_app(server: Any):
         return {"setup_required": manager is None or manager.count() == 0,
                 "database_bound": bool(server.database_bound),
                 "require_setup_password": bool(getattr(cfg, "require_setup_password", True)),
-                "product": "teamspace", "version": "0.15.0"}
+                "product": "teamspace", "version": "0.16.0"}
 
     @app.get("/api/health")
     def health():
         if not server.database_bound:
             raise HTTPException(503, "database not ready")
-        return {"ok": True, "product": "teamspace", "version": "0.15.0"}
+        return {"ok": True, "product": "teamspace", "version": "0.16.0"}
 
     @app.middleware("http")
     async def response_headers(request, call_next):

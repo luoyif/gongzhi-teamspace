@@ -4,6 +4,8 @@
 
 <p align="center">
   <a href="README.en.md">English</a> ·
+  <a href="docs/WHY_GONGZHI_ZH.md">为什么选择共知 / Key Differences</a> ·
+  <a href="docs/TEST_MATRIX_ZH.md">测试对比</a> ·
   <a href="docs/DEPLOY_ZH.md">部署指南</a> ·
   <a href="docs/FEATURES_ZH.md">功能介绍</a> ·
   <a href="docs/SCREENSHOTS.md">产品截图</a> ·
@@ -11,8 +13,14 @@
   <a href="SECURITY.md">安全边界</a>
 </p>
 
-<p align="center"><img src="docs/images/01-dashboard.webp" alt="共知团队工作台：项目、任务、日历和知识概览" width="1020"></p>
+<p align="center"><img src="docs/images/v016/01-task-execution-desktop.webp" alt="共知团队工作台：项目、任务、日历和知识概览" width="1020"></p>
 <p align="center"><sub>真实运行界面截图 · 使用隔离的演示账号和示例数据，不包含正式用户资料</sub></p>
+
+## 新版 v0.16：任务不止能讨论，还能可靠交接与验收
+
+**已上线的基础能力：**任务长期摘要（历史来源和消息游标）、真人批准的双 Agent 串行交接（最多两跳）、2–8 步顺序任务流程（每步人工启动与核验）、折叠 Trace 和一致的 Web/手机界面。
+
+[查看 8 张新版实机截图](docs/SCREENSHOTS_V016.md) · [与 QM、Ekko Studio 的真实差异](docs/WHY_GONGZHI_ZH.md)
 
 ## 为什么需要共知？
 
@@ -50,16 +58,24 @@
 
 [**查看全部 9 张真实产品截图 →**](docs/SCREENSHOTS.md)
 
+## Key Difference：共知为什么不是 QM + Ekko 的简单拼接？
+
+QM 在 Scope 权限、持久沙箱和后台执行上值得我们学习；Ekko 在多 Agent 交互与 DAG 上更成熟。共知坚持的默认结构是 **公司 → 项目 → 任务 → 讨论 → 可核验结果 → 人工采用/公司发布知识**。
+
+这里一条模型消息、一次真实 Run、一次人工验收、一个已采用的项目知识和一份公司公开快照，**不是同一个“完成”状态**。这让产品调研、研究—研发—审核的任务成果能够回到团队知识，而不要求每个新项目重新复制历史。
+
+这不是声称别人做不到或没有记忆。QM 也实现了来源/敏感度标记的版本化记忆。请看[逐项诚实比较](docs/WHY_GONGZHI_ZH.md)和[包含三方证据强度的测试矩阵](docs/TEST_MATRIX_ZH.md)。
+
 ## 核心功能
 
 | 能力 | 当前已实现 |
 |---|---|
 | **多人协作** | 团队/成员邀请、项目、任务、真人实时聊天、在线与输入状态 |
-| **AI 员工** | 显式 @Agent / @文件、团队复用的提示词、模型、Skills、MCP 和插件 |
+| **AI 员工** | 显式 @Agent / @文件、团队级配置、多员工人工批准的有限串行交接、Skills/MCP/插件 |
 | **文件和知识** | 多层文件夹、Markdown/Word/Excel/PDF 等常见格式预览、FTS5/BM25 检索、出处追溯 |
 | **AI 执行过程** | 流式、审批、执行权限设置、停止/继续、折叠 Trace、工具回执 |
 | **知识沉淀** | 讨论整理 → 待核对候选 → 人工采用 → 项目记忆 → 明确发布的公司知识 |
-| **日程和规划** | 项目计划、任务看板、负责人和期限、工作台日历、逾期提示 |
+| **日程和规划** | 项目计划、任务看板、负责人和期限、工作台日历；2–8 步人工门控的顺序计划 |
 | **语音输入** | 可选 SenseVoiceSmall，将语音转写进草稿，**不自动发送** |
 | **自托管** | Windows WSL2 / Ubuntu Linux、浏览器访问、SQLite、可自行配置 HTTPS |
 
@@ -122,7 +138,7 @@ bash app/deployment/install.sh
 
 **这是可自部署的基础版，不是已通过独立安全审计的大规模 SaaS。**
 
-- 一次执行一位 Agent；**多 Agent 同轮并行、Agent 间自主协商尚未实现**。
+- **一次 Run 一位 Agent**；任务中可以人工批准最多两跳的串行接力；**多 Agent 自主并行、复杂条件 DAG 尚未实现**。
 - SQLite、在线状态与任务执行按**单实例**设计，不承诺集群高可用。
 - 无任意宿主 shell、无限运行时间或不受约束的云电脑。
 - 外部模型、语音识别及 MCP 会使用部署者自己的额度；重要写入仍需权限和审计。

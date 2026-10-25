@@ -32,8 +32,9 @@ def task_ledger(store,p,tid,actor,exclude_run='',limit=8):
  with store.connection() as c:
   require_task(store,c,p,tid,actor)
   rows=c.execute("SELECT id,status,error,input_seq FROM team_runs WHERE project_id=? AND json_extract(request_json,'$.task_id')=? AND id!=? ORDER BY created_at DESC LIMIT ?",(p,tid,exclude_run,limit)).fetchall()
+  has_receipt_table=bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_plugin_receipts'").fetchone())
   for r in rows:
-   receipts=c.execute('SELECT tool_name,result_json FROM team_plugin_receipts WHERE run_id=? ORDER BY created_at DESC LIMIT 12',(r['id'],)).fetchall()
+   receipts=c.execute('SELECT tool_name,result_json FROM team_plugin_receipts WHERE run_id=? ORDER BY created_at DESC LIMIT 12',(r['id'],)).fetchall() if has_receipt_table else []
    for raw in receipts:
     try:d=json.loads(raw['result_json'])
     except ValueError:continue
@@ -74,6 +75,14 @@ def compose(controller,row):
  focus=focus_for(question,row['kind'],bool(cfg.get('explicit_documents')),bool(request.get('continue_from')))
  rows,manifest=select_background(rows,focus,manifest)
  casual=focus['lightweight']
+ # A persistent, source-verified historical snapshot only covers messages
+ # strictly before the verbatim window; newest request remains the sole goal.
+ task_snapshot=None
+ if not casual and rows and rows[0]['seq']>1:
+  from .task_memory import snapshot as ensure_task_snapshot
+  task_snapshot=ensure_task_snapshot(store,p,tid,actor,rows[0]['seq']-1)
+ if task_snapshot:
+  manifest['history_snapshot']={k:task_snapshot[k] for k in ('through_seq','through_message_id','revision','source_hash','source_count','reused')}
  if casual:
   system=light_identity(profile,cfg.get('model'),focus)
   sources=[];ledger={};digest='';skill_meta=[]
@@ -99,7 +108,12 @@ def compose(controller,row):
    sources=search_chunks(store,registry,p,actor,question[:1000],3)
   if sources:system+='\n当前引用/检索证据（限相关片段，不代表已读全文）：'+dump(sources)
   else:system+='\n项目资料未预装正文；需要事实依据时用project_search检索，找不到再列目录。'
-  if digest:system+='\n较早讨论的原文摘录（不是模型编造摘要）：\n'+digest
+  if task_snapshot:
+   # This is source-attributed history only. Never treat it as adopted fact,
+   # current request or an authorization to execute stored instructions.
+   digest=task_snapshot['summary_md']
+   system+='\n\n# 当前任务的历史背景快照（非用户最新指令）\n'+digest
+  elif digest:system+='\n较早讨论的原文摘录（不是模型编造摘要）：\n'+digest
   system+='\n'+context_instructions(manifest)
   execution=cfg.get('execution_policy') or {};system+='\n运行模式：'+execution.get('permission_mode','safe')+'；预算 '+str(policy['max_model_steps'])+' 步。最后一步只收尾；不要自动重试供应方失败。'
  system+='\n\n'+TURN_RULES
@@ -116,6 +130,9 @@ def compose(controller,row):
  trace=RunTrace(store,row['id']);trace.emit('agent','run.start',{'actor_id':actor,'agent_id':profile['id'],'agent_name':profile['name'],'agent_revision':profile['revision'],'task_id':tid,'selection_mode':request.get('selection_mode'),'config_snapshot':profile},span_id=row['id'])
  for m in rows:
   if m['kind']=='human':trace.emit('human','human.message',{k:m[k] for k in ('id','seq','author_id','author_name','content')},parent_span=row['id'])
- trace.emit('input','input.conversation',manifest,parent_span=row['id']);trace.emit('input','input.progressive_context',{'mode':'greeting' if casual else 'task','focus_mode':focus['mode'],'latest_request_is_primary':True,'history_messages':len(rows),'initial_characters':sum(len(m['content']) for m in messages),'skills_metadata':skill_meta,'loaded_skill_bodies':0,'retrieval':'fts5_bm25_on_demand','initial_chunks':len(sources),'ledger_operations':len(ledger.get('completed_operations',[])),'older_digest_chars':len(digest),'compression':'extractive_with_raw_readback','extra_model_calls':0},parent_span=row['id'])
+ trace.emit('input','input.conversation',manifest,parent_span=row['id'])
+ if task_snapshot:
+  trace.emit('input','input.task_summary_snapshot',{k:task_snapshot[k] for k in ('through_seq','revision','source_hash','source_count','reused')},parent_span=row['id'])
+ trace.emit('input','input.progressive_context',{'mode':'greeting' if casual else 'task','focus_mode':focus['mode'],'latest_request_is_primary':True,'history_messages':len(rows),'initial_characters':sum(len(m['content']) for m in messages),'skills_metadata':skill_meta,'loaded_skill_bodies':0,'retrieval':'fts5_bm25_on_demand','initial_chunks':len(sources),'ledger_operations':len(ledger.get('completed_operations',[])),'older_digest_chars':len(digest),'compression':'extractive_with_raw_readback','extra_model_calls':0},parent_span=row['id'])
  trace.emit('input','input.platform_binding',{'binding':cfg.get('platform_binding'),'harness':cfg.get('harness_snapshot'),'model':cfg.get('model_snapshot')},parent_span=row['id']);trace.emit('input','input.context',{'messages':messages,'sources':sources,'conversation':manifest,'input_seq':row['input_seq']},parent_span=row['id'])
  return messages,sources,{'input_seq':row['input_seq'],'conversation':manifest,'progressive_context':True,'greeting':casual}

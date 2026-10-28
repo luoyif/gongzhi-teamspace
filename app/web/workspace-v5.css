@@ -388,3 +388,108 @@ body.gongzhi-fusion{
  .gongzhi-fusion .doc-card,
  .gongzhi-fusion .task-card{transition:none;transform:none!important}
 }
+
+/* Gongzhi original source-evidence visualization; no QM or Ekko source copied. */
+.gongzhi-fusion .evidence-flow-card{max-width:100%}
+.gongzhi-fusion .evidence-flow-stages{display:grid;grid-template-columns:1fr;gap:8px}
+.gongzhi-fusion .evidence-flow-stage{border:1px solid var(--fusion-border);padding:9px;
+ border-radius:10px;background:var(--fusion-soft);display:grid;gap:4px;min-width:0}
+.gongzhi-fusion .evidence-flow-stage strong{font-size:11px;font-weight:650;letter-spacing:-.1px}
+.gongzhi-fusion .evidence-flow-stage small{font-size:10px;line-height:1.5;
+ color:var(--muted);overflow-wrap:anywhere}
+.gongzhi-fusion .evidence-flow-number{font-size:13px;font-weight:680;
+ font-variant-numeric:tabular-nums;color:var(--accent)}
+.gongzhi-fusion .evidence-flow-details{background:transparent;padding:0;border-top:1px solid var(--fusion-border)}
+.gongzhi-fusion .evidence-flow-details>summary{list-style:none;font-size:11px;
+ color:var(--text);cursor:pointer;font-weight:600;padding:9px 3px}
+.gongzhi-fusion .evidence-flow-details>summary::-webkit-details-marker{display:none}
+.gongzhi-fusion .evidence-flow-details>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.gongzhi-fusion .evidence-flow-details-list{display:flex;flex-direction:column;gap:5px;max-width:100%}
+.gongzhi-fusion .evidence-flow-item{display:flex;gap:7px;align-items:center;min-width:0;
+ background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px}
+.gongzhi-fusion .evidence-flow-kind{color:var(--accent);font-size:9px;white-space:nowrap;
+ min-width:45px;font-weight:620}
+.gongzhi-fusion .evidence-flow-description{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+.gongzhi-fusion .evidence-flow-description strong{font-size:10px;font-weight:600;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gongzhi-fusion .evidence-flow-description small{font-size:9px;color:var(--muted);
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gongzhi-fusion .evidence-flow-relation{font-size:9px;color:var(--muted);padding:5px 2px;
+ display:flex;align-items:center;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line)}
+.gongzhi-fusion .evidence-flow-relation code{font-size:9px;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.gongzhi-fusion .evidence-flow-alert{font-size:10px;color:var(--danger);
+ border-left:2px solid var(--danger);padding:7px;margin:0}
+@media(max-width:760px){
+.gongzhi-fusion .evidence-flow-stage{padding:8px}
+.gongzhi-fusion .evidence-flow-details>summary{padding:8px 0}
+}
+
+/* Native Gongzhi knowledge-flow graph: original SVG DOM nodes and scoped evidence inspector. */
+.gongzhi-fusion .evidence-map-cta{
+ display:grid;gap:9px;border:1px solid var(--fusion-border);
+ border-radius:10px;padding:11px;background:var(--fusion-soft);
+}
+.gongzhi-fusion .evidence-map-cta>div{display:flex;flex-direction:column;gap:5px}
+.gongzhi-fusion .evidence-map-cta strong{font-size:12px;font-weight:650;color:var(--text)}
+.gongzhi-fusion .evidence-map-cta small{font-size:10px;line-height:1.5;color:var(--muted)}
+.gongzhi-fusion .evidence-map-cta button{justify-self:start}
+.gongzhi-fusion .evidence-map-hero{display:flex;gap:17px;justify-content:space-between;align-items:center;
+ border:1px solid var(--line);border-radius:16px;background:var(--surface);
+ margin-bottom:17px;padding:17px 19px;box-shadow:var(--fusion-card-shadow)}
+.gongzhi-fusion .evidence-map-hero-content{display:flex;flex-direction:column;gap:6px;min-width:0}
+.gongzhi-fusion .evidence-map-hero-content strong{font-size:15px;letter-spacing:-.2px}
+.gongzhi-fusion .evidence-map-hero-content p{font-size:11px;color:var(--muted);margin:0;line-height:1.6}
+.gongzhi-fusion .evidence-map-hero button{flex-shrink:0}
+.gongzhi-fusion .evidence-map-modal{display:flex;flex-direction:column;gap:12px;min-width:0}
+.gongzhi-fusion .evidence-map-intro{font-size:12px;line-height:1.65;color:var(--muted);margin:0}
+.gongzhi-fusion .evidence-map-toolbar{display:flex;align-items:center;gap:12px;
+ justify-content:space-between;flex-wrap:wrap}
+.gongzhi-fusion .evidence-map-toolbar label{font-size:11px;color:var(--muted);
+ display:flex;align-items:center;gap:10px;font-weight:600}
+.gongzhi-fusion .evidence-map-toolbar select{min-height:34px;min-width:176px;font-size:11px}
+.gongzhi-fusion .evidence-map-toolbar small{font-size:10px;color:var(--muted)}
+.gongzhi-fusion .evidence-map-panels{display:grid;grid-template-columns:minmax(0,1fr) 245px;
+ gap:12px;min-width:0;max-height:min(65vh,670px)}
+.gongzhi-fusion .evidence-map-graph{display:flex;flex-direction:column;
+ border:1px solid var(--line);border-radius:13px;overflow:hidden;
+ background:var(--sidebar);min-width:0;min-height:230px}
+.gongzhi-fusion .evidence-map-scroll{overflow:auto;flex:1;min-height:200px;
+ scrollbar-width:thin;outline-offset:-3px}
+.gongzhi-fusion .evidence-map-scroll:focus-visible{outline:2px solid var(--accent)}
+.gongzhi-fusion .evidence-map-svg{display:block;user-select:none}
+.gongzhi-fusion .evidence-map-node{cursor:pointer;outline:none}
+.gongzhi-fusion .evidence-map-node.is-selected rect{stroke-width:2.8}
+.gongzhi-fusion .evidence-map-node:hover rect{stroke-width:2.5}
+.gongzhi-fusion .evidence-map-node:focus-visible rect{stroke-width:3}
+.gongzhi-fusion .evidence-map-node:focus-visible text{font-weight:750}
+.gongzhi-fusion .evidence-map-footnote{display:flex;justify-content:space-between;
+ gap:10px;flex-wrap:wrap;padding:8px 10px;border-top:1px solid var(--line);
+ background:var(--surface)}
+.gongzhi-fusion .evidence-map-footnote small{font-size:10px;color:var(--muted)}
+.gongzhi-fusion .evidence-map-footnote .evidence-map-truncated{color:var(--danger)}
+.gongzhi-fusion .evidence-map-inspector{border:1px solid var(--line);
+ border-radius:13px;padding:12px;overflow:auto;background:var(--surface);
+ display:flex;flex-direction:column;gap:9px;min-width:0}
+.gongzhi-fusion .evidence-map-inspect-head{display:flex;flex-direction:column;
+ align-items:flex-start;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.gongzhi-fusion .evidence-map-inspect-head strong{font-size:13px;line-height:1.5;
+ overflow-wrap:anywhere}
+.gongzhi-fusion .evidence-map-inspect-row{display:flex;flex-direction:column;gap:3px}
+.gongzhi-fusion .evidence-map-inspect-row span{font-size:10px;color:var(--muted)}
+.gongzhi-fusion .evidence-map-inspect-row strong{font-size:10px;color:var(--text);
+ font-weight:600;overflow-wrap:anywhere;max-width:100%}
+.gongzhi-fusion .evidence-map-inspector .row{margin-top:auto}
+.gongzhi-fusion .evidence-map-inspector button{font-size:10px}
+.gongzhi-fusion .evidence-map-source-restricted{font-size:11px;color:var(--muted);
+ line-height:1.55;border-left:2px solid var(--accent);padding:6px 8px;
+ background:var(--sidebar);border-radius:5px;margin:0}
+@media(max-width:880px){
+ .gongzhi-fusion .evidence-map-panels{grid-template-columns:1fr;max-height:min(75vh,830px)}
+ .gongzhi-fusion .evidence-map-scroll{max-height:390px;min-height:190px}
+ .gongzhi-fusion .evidence-map-inspector{max-height:290px}
+ .gongzhi-fusion .evidence-map-hero{flex-direction:column;align-items:stretch}
+ .gongzhi-fusion .evidence-map-hero button{align-self:start}
+}
+@media(prefers-reduced-motion:reduce){
+ .gongzhi-fusion .evidence-map-node{transition:none}
+}

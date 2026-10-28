@@ -1,5 +1,9 @@
 # Gongzhi — A Shared Knowledge Workspace for People & AI Agents
 
+## v0.16.1: provenance graphs and backup repair
+
+Task and team graphs show recorded sources, execution, human review and publication, with project access checked on each request. SQLite backup now closes its connections before archiving to prevent transient journal files from invalidating restore checks. The graph does not infer facts or publish knowledge automatically. See the [knowledge graph guide](docs/KNOWLEDGE_GRAPH_EN.md).
+
 <p align="center"><strong>Collaboration should produce knowledge that survives the conversation.</strong></p>
 
 <p align="center">

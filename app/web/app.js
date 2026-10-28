@@ -1,3 +1,4 @@
+import {evidenceGraphProjection,EVIDENCE_TYPE_LABELS} from './knowledge-flow-layout.mjs';
 import {attachSpeechInput} from './voice-ui.mjs';
 import {dateKeyInZone,entriesOnDay,agendaFrom} from './calendar-ui.mjs';
 import {PRESET_AVATARS,messageSide,avatarNode,updateAvatar} from './persona-ui.mjs';
@@ -2732,6 +2733,354 @@ taskContextPanel=function(){
   }
  }
  return panel;
+};
+
+// Gongzhi Evidence Flow: task-bound provenance view, independently implemented.
+// Queries happen ONLY when the member expands this task's panel. Stored rows
+// are evidence; model text is never displayed as a verified company decision.
+const evidenceFlowText={
+ message:'讨论',run:'执行',document:'项目资料',review_step:'人工审核',
+ handoff:'员工接力',published_knowledge:'团队知识',task:'当前任务'
+};
+const evidenceFlowStateText={
+ recorded_not_verified:'历史记录',execution_record_not_adoption:'已记录运行',
+ project_adopted:'项目已采用',not_adopted:'尚未采用',
+ human_accepted_step:'真人已核验',not_human_accepted:'等待核验',
+ operator_authorized:'已批准交接',pending:'待审批',
+ explicitly_published_snapshot:'公司已发布'
+};
+function renderEvidenceFlow(container,data,taskId){
+ container.replaceChildren();
+ if(data.scope!=='task'||data.task_id!==taskId){
+  container.append(el('p',{class:'form-error'},'证据范围异常，请刷新任务后重试'));return;
+ }
+ const caption=container.closest('.fusion-card')?.querySelector('[data-evidence-count]');
+ if(caption)caption.textContent='讨论 '+(data.counts?.messages||0)+' · 审核 '+(data.counts?.workflow_steps||0);
+ const docs=(data.nodes||[]).filter(x=>x.type==='document');
+ const publications=(data.nodes||[]).filter(x=>x.type==='published_knowledge');
+ const approvals=(data.nodes||[]).filter(x=>x.type==='review_step'&&x.approval_recorded);
+ const messages=(data.nodes||[]).filter(x=>x.type==='message');
+ const runs=(data.nodes||[]).filter(x=>x.type==='run');
+ const blocks=[
+  {label:'① 原始讨论',count:data.counts?.messages||0,note:'真人与 AI 原话保存在同一任务，内容哈希可回查。'},
+  {label:'② Agent 执行',count:data.counts?.runs||0,note:'只有持久化 Run 和真实回复才展示；模型声称完成并非已验收。'},
+  {label:'③ 人工核验',count:approvals.length,note:'管理员已审查并记录审批；这是人类采纳行为，不等于外部事实一定正确。'},
+  {label:'④ 项目资料',count:data.counts?.documents||0,note:'文件按项目保存，采用状态与版本独立管理。'},
+  {label:'⑤ 团队公开知识',count:data.counts?.publications||0,note:'仅展示明确发布且当前有效的公司知识快照。'}
+ ];
+ const flow=el('div',{class:'evidence-flow-stages'});
+ for(const stage of blocks)
+  flow.append(el('div',{class:'evidence-flow-stage'},
+   el('div',{class:'row spread'},el('strong',{},stage.label),
+    el('span',{class:'evidence-flow-number'},stage.count)),
+   el('small',{},stage.note)));
+ container.append(flow);
+ if(data.partial)container.append(el('p',{class:'evidence-flow-alert'},
+  '较长任务：仅展示最近部分来源节点。全量历史仍保存在数据库，不能把图视作完整记录。'));
+ const trace=el('details',{class:'evidence-flow-details'},
+  el('summary',{},'可核对的来源节点 · '+(data.nodes?.length||0)+' 项'),
+  el('div',{class:'evidence-flow-details-list'}));
+ const body=trace.querySelector('.evidence-flow-details-list');
+ const selected=[...publications,...approvals,...docs,...runs,...messages.slice(0,12)];
+ const max=40;
+ for(const node of selected.slice(0,max)){
+  const label=evidenceFlowText[node.type]||node.type;
+  let title=node.title||node.speaker||node.id;
+  if(node.type==='message')title='消息 #'+node.seq+' · '+(node.speaker||'');
+  if(node.type==='run')title='Run '+node.id.slice(4,19);
+  if(node.type==='review_step')title=node.title||'流程审批';
+  const status=evidenceFlowStateText[node.source_state]||node.source_state||'';
+  const row=el('div',{class:'evidence-flow-item'},
+   el('span',{class:'evidence-flow-kind'},label),
+   el('div',{class:'evidence-flow-description'},
+    el('strong',{},title),
+    el('small',{},status+' · '+node.id.slice(0,35))));
+  if(node.type==='run'&&typeof openTrace==='function'){
+   row.append(button('Trace',()=>openTrace(node.id.slice(4)),{class:'small ghost'}));
+  }
+  body.append(row);
+ }
+ if(selected.length>max)body.append(el('small',{class:'fusion-hint'},'还有来源可通过任务消息或资料页继续查看。'));
+ container.append(trace);
+ const relations=el('details',{class:'evidence-flow-details'},
+  el('summary',{},'来源关系 · '+(data.edges?.length||0)+' 条'),
+  el('div',{class:'evidence-flow-details-list'}));
+ const table=relations.querySelector('.evidence-flow-details-list');
+ for(const item of (data.edges||[]).slice(0,32)){
+  table.append(el('div',{class:'evidence-flow-relation'},
+   el('code',{},item.from.slice(0,22)),el('span',{},' → '+item.relation+' → '),
+   el('code',{},item.to.slice(0,22))));
+ }
+ if((data.edges?.length||0)>32)table.append(el('small',{class:'fusion-hint'},'仅展示部分关系，完整图仍由后台按当前权限返回。'));
+ container.append(relations,
+  el('p',{class:'fusion-hint'},'证据依据是数据库记录和项目 ACL；不使用 AI 猜测关系。权限撤回、来源变更后的下一次请求将重新校验。'));
+}
+const evidenceFlowOriginalTaskPanel=taskContextPanel;
+taskContextPanel=function(){
+ const panel=evidenceFlowOriginalTaskPanel();
+ if(!state.task)return panel;
+ const root=panel.querySelector('.fusion-panel-wrap');
+ if(!root)return panel;
+ const taskId=state.task.id,generation=state.generation;
+ const detail=el('details',{class:'fusion-card evidence-flow-card'},
+  el('summary',{},icon('files',15),el('strong',{},'知识流转与证据'),
+   el('small',{'data-evidence-count':''},'按需读取'),icon('chevron',14)),
+  el('div',{class:'fusion-card-body','data-evidence-flow':''},
+   el('p',{class:'fusion-hint'},'展开后按当前任务和权限读取真实来源。')));
+ const flowbody=detail.querySelector('[data-evidence-flow]');
+ const load=async()=>{
+  if(!detail.isConnected || !detail.open || state.task?.id!==taskId || state.generation!==generation)return;
+  flowbody.replaceChildren(el('p',{class:'fusion-hint'},'核验来源、审批与公司发布记录…'));
+  try{
+   const info=await api('/tasks/'+taskId+'/evidence-graph');
+   if(detail.isConnected && detail.open && state.task?.id===taskId && state.generation===generation)
+    renderEvidenceFlow(flowbody,info,taskId);
+  }catch(e){
+   if(detail.isConnected && detail.open && state.task?.id===taskId && state.generation===generation)
+    flowbody.replaceChildren(el('p',{class:'form-error'},'读取证据失败，请检查项目权限后重新展开。'));
+  }
+ };
+ detail.addEventListener('toggle',()=>{if(detail.open)load();});
+ root.append(detail);
+ return panel;
+};
+
+// Original knowledge provenance graph UI for Gongzhi.
+// This visualizes only backend-verified edges; an LLM never invents relationships.
+const evidenceGraphLabels={
+ ...EVIDENCE_TYPE_LABELS,
+};
+const evidenceStates={
+ recorded_not_verified:'有记录，未独立核验',
+ execution_record_not_adoption:'Run已记录，未采用',
+ project_adopted:'项目已人工采用',
+ not_adopted:'尚未被采用',
+ original_upload_record:'真实上传来源',
+ trace_event_recorded_not_independent_verification:'Trace事件已记录',
+ human_accepted_step:'真人确认此步骤',
+ not_human_accepted:'未完成真人验收',
+ operator_authorized:'人工批准交接',
+ pending:'仍待授权',
+ explicitly_published_snapshot:'团队已明确发布',
+ source_document_accessible_not_automatically_published:'来源文件可读，非自动公开',
+ original_project_task:'来源任务',
+};
+function evidenceSvg(tag,attrs={},textValue){
+ const node=document.createElementNS('http://www.w3.org/2000/svg',tag);
+ for(const [k,v] of Object.entries(attrs)) if(v!==undefined&&v!==null)node.setAttribute(k,String(v));
+ if(textValue!==undefined)node.textContent=String(textValue);
+ return node;
+}
+function evidenceTrim(str,n=19){
+ const chars=Array.from(String(str||''));
+ return chars.length<=n?chars.join(''):chars.slice(0,n-1).join('')+'…';
+}
+function evidenceVisibleLabel(item){
+ if(item.type==='message')return '消息 #'+(item.seq??'?')+' · '+(item.speaker||'成员');
+ if(item.type==='run')return 'Run '+item.id.slice(4,16);
+ if(item.type==='tool_event')return (item.event||'工具事件')+' #'+(item.trace_seq||0);
+ return item.title||item.speaker||item.id;
+}
+function evidenceTone(type){
+ return {
+  workspace:'var(--accent)',project:'var(--accent)',task:'var(--accent)',
+  message:'var(--muted)',run:'var(--accent)',handoff:'var(--accent)',
+  tool_event:'var(--muted)',source_upload:'var(--muted)',
+  document:'var(--accent)',review_step:'var(--accent)',
+  published_knowledge:'var(--accent)'
+ }[type]||'var(--muted)';
+}
+function evidenceInspector(panel,item,graph,dialog){
+ panel.replaceChildren();
+ if(!item){
+  panel.append(el('p',{class:'fusion-hint'},'选择任意节点查看来源、审批与版本信息。'));
+  return;
+ }
+ const name=evidenceVisibleLabel(item);
+ panel.append(el('div',{class:'evidence-map-inspect-head'},badge(evidenceGraphLabels[item.type]||item.type),
+  el('strong',{},name)));
+ const rows=[
+  ['状态',evidenceStates[item.source_state]||item.source_state||item.status||'有记录'],
+  ['可见范围',item.audience||item.scope||graph.audience||'任务范围'],
+  ['版本',item.revision!=null?'v'+item.revision:null],
+  ['来源可读',item.source_visibility==='restricted'?'无来源项目访问权':item.source_visibility==='authorized'?'当前有来源项目权限':null],
+  ['消息序号',item.seq!=null?'#'+item.seq:null],
+  ['核验人',item.approved_by!=null?'成员 #'+item.approved_by:null],
+  ['发布人',item.published_by!=null?'成员 #'+item.published_by:null],
+  ['来源文件版本',item.published_source_revision!=null?'v'+item.published_source_revision:null],
+  ['当前与发布版本一致',item.current_matches_published_revision===false?'否（原件后来已变化）':item.current_matches_published_revision===true?'是':null],
+  ['来源正文哈希',item.content_sha256||item.body_sha256||item.review_note_sha256||null],
+  ['敏感度',item.sensitivity_status==='unclassified'?'尚无分类标签，不代表公开/安全':null]
+ ].filter(([,v])=>v!==null&&v!==undefined);
+ for(const [name,value] of rows)panel.append(el('div',{class:'evidence-map-inspect-row'},
+  el('span',{},name),el('strong',{title:String(value)},String(value))));
+ if(item.source_visibility==='restricted')panel.append(el('p',{class:'evidence-map-source-restricted'},
+  '你可以阅读明确发布的公司快照，但没有来源项目的权限。不会显示原始文件、任务名称及其ID。'));
+ const raw=item.id.slice(item.id.indexOf(':')+1);
+ const actions=el('div',{class:'row wrap'});
+ if(item.type==='run'&&graph.task_id){
+  actions.append(button('查看执行 Trace',()=>{dialog.close();openTrace(raw);},{class:'small ghost',icon:'plan'}));
+ }
+ if(item.type==='published_knowledge'){
+  actions.append(button('阅读已发布快照',()=>{dialog.close();openKnowledge({id:raw,kind:'company'}).catch(handle);},{class:'small ghost',icon:'files'}));
+ }
+ if(item.type==='task'&&item.project_id){
+  actions.append(button('回到来源任务',()=>{dialog.close();openTask(raw,item.project_id).catch(handle);},{class:'small ghost',icon:'tasks'}));
+ }
+ if(item.type==='document'&&item.project_id){
+  actions.append(button('查看来源资料',async()=>{
+   dialog.close();
+   try{
+    if(!state.project||state.project.id!==item.project_id)await selectProject(item.project_id);
+    await documentDialog(raw);
+   }catch(e){handle(e);}
+  },{class:'small ghost',icon:'files'}));
+ }
+ actions.append(button('复制来源编号',async()=>{
+  try{await navigator.clipboard.writeText(raw);toast('来源编号已复制');}
+  catch(e){toast('复制失败，请检查浏览器权限',true);}
+ },{class:'small ghost',icon:'clip'}));
+ panel.append(actions);
+}
+function buildEvidenceCanvas(host,graph,filter,inspect,dialog){
+ host.replaceChildren();
+ const projected=evidenceGraphProjection(graph,{filter});
+ const byId=new Map(projected.nodes.map(n=>[n.id,n]));
+ if(!projected.nodes.length){
+  host.append(el('p',{class:'fusion-hint'},'当前筛选没有可展示的来源对象。'));return;
+ }
+ const frame=el('div',{class:'evidence-map-scroll',tabindex:0,'aria-label':'可横向滚动的任务来源关系图'});
+ const svg=evidenceSvg('svg',{viewBox:'0 0 '+projected.width+' '+projected.height,
+  width:projected.width,height:projected.height,'aria-label':'真实来源、执行、审核和发布关系图',
+  role:'group',class:'evidence-map-svg'});
+ const defs=evidenceSvg('defs');
+ const marker=evidenceSvg('marker',{id:'evidence-flow-arrow',markerWidth:9,markerHeight:9,refX:7,refY:4.5,orient:'auto'});
+ marker.append(evidenceSvg('path',{d:'M1 1 L7 4.5 L1 8 z',fill:'var(--muted)'}));
+ defs.append(marker);svg.append(defs);
+ for(const type of projected.types){
+  const item=projected.nodes.find(n=>n.type===type);
+  if(!item)continue;
+  const x=item.layout_x;
+  svg.append(evidenceSvg('rect',{x:x-8,y:37,width:180,height:projected.height-51,rx:13,
+   fill:'var(--surface)',stroke:'var(--line)','stroke-width':0.75,opacity:.7}));
+  svg.append(evidenceSvg('text',{x:x+2,y:24,'font-size':12,'font-weight':650,fill:'var(--text)'},
+    evidenceGraphLabels[type]||type));
+  const extra=projected.displayCounts[type];
+  svg.append(evidenceSvg('text',{x:x+154,y:24,'font-size':10,'text-anchor':'end',fill:'var(--muted)'},
+    extra.visible===extra.total?String(extra.total):extra.visible+'/'+extra.total));
+ }
+ const relationNodes=[];
+ for(const e of projected.edges){
+  const start=byId.get(e.from),end=byId.get(e.to);
+  if(!start||!end)continue;
+  const x1=start.layout_x+(end.layout_col>start.layout_col?163:0);
+  const x2=end.layout_x+(end.layout_col<=start.layout_col?163:0);
+  const y1=start.layout_y, y2=end.layout_y;
+  const diff=Math.max(38,Math.abs(x2-x1)*.42);
+  const sgn=x2>=x1?1:-1;
+  const d='M '+x1+' '+y1+' C '+(x1+sgn*diff)+' '+y1+', '+(x2-sgn*diff)+' '+y2+', '+x2+' '+y2;
+  const isContainer=/^(?:contains_|has_|project_contains_|workspace_published)/.test(e.relation);
+  const line=evidenceSvg('path',{d,fill:'none',stroke:'var(--muted)',
+   'stroke-width':isContainer?1:1.6,'stroke-opacity':isContainer?.21:.56,
+   'marker-end':'url(#evidence-flow-arrow)',
+   'data-source':e.from,'data-target':e.to});
+  relationNodes.push(line);svg.append(line);
+ }
+ const groupNodes=[];
+ function selectNode(n){
+  evidenceInspector(inspect,n,graph,dialog);
+  for(const {id,group} of groupNodes)group.classList.toggle('is-selected',id===n.id);
+  for(const line of relationNodes){
+   const connected=line.dataset.source===n.id||line.dataset.target===n.id;
+   line.setAttribute('stroke-opacity',connected?.96:.1);
+   line.setAttribute('stroke-width',connected?2.5:1);
+  }
+ }
+ for(const n of projected.nodes){
+  const group=evidenceSvg('g',{class:'evidence-map-node',role:'button',tabindex:0,
+    'aria-label':(evidenceGraphLabels[n.type]||n.type)+'：'+evidenceVisibleLabel(n),
+    transform:'translate('+n.layout_x+','+(n.layout_y-25)+')'});
+  group.append(evidenceSvg('rect',{width:163,height:51,rx:9,fill:'var(--sidebar)',
+    stroke:evidenceTone(n.type),'stroke-width':1.25}));
+  group.append(evidenceSvg('text',{x:10,y:16,'font-size':9,fill:'var(--muted)',class:'evidence-map-node-kind'},
+    evidenceGraphLabels[n.type]||n.type));
+  group.append(evidenceSvg('text',{x:10,y:35,'font-size':11,'font-weight':650,fill:'var(--text)'},
+    evidenceTrim(evidenceVisibleLabel(n),19)));
+  group.append(evidenceSvg('title',{},evidenceVisibleLabel(n)+' · '+(n.source_state||'')));
+  group.addEventListener('click',()=>selectNode(n));
+  group.addEventListener('keydown',evt=>{
+   if(evt.key==='Enter'||evt.key===' '){evt.preventDefault();selectNode(n);}
+  });
+  svg.append(group);groupNodes.push({id:n.id,group});
+ }
+ frame.append(svg);
+ host.append(frame,el('div',{class:'evidence-map-footnote'},
+  el('small',{},'节点 '+projected.nodes.length+'/'+projected.totalNodes+' · 显示关系 '+projected.edges.length+'/'+projected.totalEdges),
+  projected.partial&&el('small',{class:'evidence-map-truncated'},'内容较多：这里只展示部分节点。完整来源应通过任务记录核对。')));
+ const first=projected.nodes.find(n=>n.type==='published_knowledge')
+  || projected.nodes.find(n=>n.type==='review_step'&&n.approval_recorded)
+  || projected.nodes[0];
+ selectNode(first);
+}
+function openKnowledgeGraph(graph,title){
+ // Rejected/partial/missing data should not be filled in with inferred edges.
+ if(!graph||!Array.isArray(graph.nodes)||!Array.isArray(graph.edges)){
+  toast('当前没有可核对的关系数据',true);return;
+ }
+ const inspect=el('aside',{class:'evidence-map-inspector','aria-label':'选中来源的核查详情'});
+ const stage=el('div',{class:'evidence-map-graph'});
+ const choice=el('select',{class:'input','aria-label':'关系显示范围'},[
+  el('option',{value:'all'},'全部关系'),
+  el('option',{value:'origin'},'只看源文件与执行'),
+  el('option',{value:'reviewed'},'只看审批与已发布知识')
+ ]);
+ const expl=el('p',{class:'evidence-map-intro'},
+  graph.audience==='workspace'
+   ?'公司共享知识只展示已正式发布的快照；原始项目来源只有具备项目权限的人可以展开。'
+   :'任务知识关系仅展示数据库真实消息、来源文件、Run、人工验收和发布事件。模型文本不能伪造边。');
+ const content=el('div',{class:'evidence-map-modal'},
+  expl,el('div',{class:'evidence-map-toolbar'},el('label',{},'视图',choice),
+   el('small',{},graph.partial?'数据已截断，按需核查原始记录':'当前可见关系已加载')),
+  el('div',{class:'evidence-map-panels'},stage,inspect));
+ const dlg=openDialog(title,content,{wide:true});
+ const draw=()=>buildEvidenceCanvas(stage,graph,choice.value,inspect,dlg);
+ choice.addEventListener('change',draw);
+ draw();
+}
+const evidenceFlowRenderBeforeGraph=renderEvidenceFlow;
+renderEvidenceFlow=function(container,data,tid){
+ evidenceFlowRenderBeforeGraph(container,data,tid);
+ const action=button('查看完整知识关系图',async()=>{
+  action.disabled=true;
+  try{
+   const refreshed=await api('/tasks/'+tid+'/evidence-graph');
+   if(state.task?.id!==tid)return;
+   openKnowledgeGraph(refreshed,'任务知识图谱 · '+(state.task.title||'当前任务'));
+  }catch(e){handle(e);}finally{action.disabled=false;}
+ },{class:'small primary',icon:'plan'});
+ container.insertBefore(el('div',{class:'evidence-map-cta'},
+  el('div',{},el('strong',{},'这项任务的知识从哪里来？'),
+  el('small',{},'查看资料、真人讨论、真实 Run、人工核验与已发布快照的关系')),
+  action),container.firstChild);
+};
+const renderCompanyKnowledgeBeforeGraph=renderCompanyKnowledge;
+renderCompanyKnowledge=function(container,data){
+ renderCompanyKnowledgeBeforeGraph(container,data);
+ const workspace=state.workspace;
+ if(!workspace)return;
+ const banner=el('section',{class:'evidence-map-hero'},
+  el('div',{class:'evidence-map-hero-content'},
+   el('strong',{},'团队知识图谱 · 只展示真实授权范围'),
+   el('p',{},'哪些知识已成为公司共享资产？哪些仍只属于原项目？查看来源、修订与共享边界。')),
+  button('查看团队知识图谱',async()=>{
+   const id=workspace.id;
+   try{
+    const view=await api('/workspaces/'+id+'/knowledge-graph');
+    if(state.workspace?.id!==id)return;
+    openKnowledgeGraph(view,'团队知识图谱 · '+(workspace.name||'当前团队'));
+   }catch(e){handle(e);}
+  },{class:'primary',icon:'files'}));
+ container.insertBefore(banner,container.firstChild);
 };
 
 bootstrap();

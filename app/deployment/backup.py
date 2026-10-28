@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Consistent SQLite snapshot + immutable originals. Backups contain credentials."""
 import argparse
+from contextlib import closing
 import datetime as dt
 import hashlib
 import json
@@ -22,7 +23,10 @@ def backup(root,destination):
     target=destination/f"team-ai-{stamp}.tar.gz"
     with tempfile.TemporaryDirectory(prefix="team-ai-backup-") as temp:
         stage=Path(temp)/"data"; stage.mkdir()
-        with sqlite3.connect(source) as src,sqlite3.connect(stage/"octop.db") as dst:
+        # Close both connections before hashing and archiving. A connection
+        # context manager commits but does not close, so SQLite WAL/SHM files
+        # could otherwise change between manifest creation and tar creation.
+        with closing(sqlite3.connect(source)) as src, closing(sqlite3.connect(stage/"octop.db")) as dst:
             src.backup(dst)
             assert dst.execute("PRAGMA quick_check").fetchone()[0]=="ok"
             references=[]
